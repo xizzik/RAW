@@ -1,0 +1,127 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 11"
+subtitle: 'Redukcja wymiarowości' 
+author: 
+  name: 'Adrian Kowalski'
+  affiliation: 'Politechnika Krakowska'
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(ggfortify)
+library(VGAM)
+library(caret)
+library(e1071)
+```
+
+```{r}
+wine <- readr::read_csv('Wine.csv') %>% dplyr::mutate(Customer_Segment = as.factor(Customer_Segment))
+head(wine)
+```
+
+# Po co redukować wymiary?
+
+Na sam początek należy zadać pytanie: "Po co redukować wymiary w danych?". Odpowiedzi nasuwa się kilka. Byćmoże najbardziej oczywistą jest fakt, że mamy bardzo ograniczone możliwości wizualizacji danych, jeżeli rozważamy więcej niż 3 cechy (a już dla 3 wizualizacja robi się problematyczna). Jeżeli bylibyśmy w stanie znaleźć algorytmy, które sprowadzą nasze dane do przestrzeni $2$-wymiarowej i zachowują zależności między nimi (chociażby relatywne odległości), to przy odpowiedniej interpretacji taka wizualizacja byłaby korzystna. 
+
+Druga odpowiedź, na którą nie trudno wpaść, wiąże się z powiedzeniem, że "w $R^n$ wszystko jest daleko od siebie" (dla dużych $n$). Zjawisko to zwane jest "klątwą wymiarowości" (chcemy mieć jak najwięcej cech, aby dokładnie badać zależności, ale natykamy się na problem ze zbieżnością). Zatem, gdy mamy dużą przestrzeń cech, odległości między punktami będą bardzo duże, przez co algorytmy bazujące na odległościach (większość z poznanych przez nas) będą miały problemy ze zbieżnością. Korzystnym rozwiązaniem byłoby zatem sprowadzić jakoś nasze dane do przestrzeni o zdecydowanie mniejszej ilości wymiarów, zachowując jednak przy tym strukturę zależności między punktami. 
+
+Algorytmy, o których mowa oczywiście istnieją i zajmiemy się dziś podstawowymi dwoma.
+
+# Redukcja wymiarowości przy pomocy LDA
+
+Na poprzednich zajęciach poznaliśmy algorytm LDA, którego używaliśmy do klasyfikacji. Okazuje się, że nie jest to jedyne zastoswanie tego algorytmu. Za pomocą LDA możemy też dokonywać redukcji wymiarowości. W tej sytuacji jest to algorytm uczenia nadzorowanego, wymagamy do uczenia danych z etykietami. Dzięki temu, algorytm LDA znajduje projekcję na $K-1$ wymiarową przestrzeń (gdzie $K$ to liczba klas), w której nasze dane są "najlepiej" rozdzielone.
+
+```{r}
+index <- caret::createDataPartition(wine$Customer_Segment, list = FALSE)
+wine_train <- wine[index,]
+wine_test <- wine[-index,]
+```
+
+```{r}
+lda_1 <- MASS::lda(Customer_Segment ~. , data = wine_train)
+wine_train_transform <- as.data.frame(predict(lda_1, wine_train))
+wine_test_transform <- as.data.frame(predict(lda_1, wine_test))
+head(wine_test_transform)
+```
+```{r}
+lda_1$scaling
+```
+
+```{r}
+ggplot(data = wine_test_transform, aes(x = x.LD1, y = x.LD2, color = wine_test$Customer_Segment)) + geom_point() + labs(x = 'First Linear Discriminant', y = 'Second Linear Discriminant', color = 'Customer Segment', title = 'Wine test data in Linear Discriminant space')
+```
+
+
+# Analiza składowych głównych PCA
+
+Innym algorytmem redukcji wymiarowości jest analiza składowych głównych PCA. Stosuje ona nieco inne podejście, przez co nie wymaga danych etykietowanych. W wypadku tego algorytmu nie będziemy projektowali na przestrzeń, która najlepiej rozdziela nasze dane pod względem klas. Otrzymamy jednak projekcję na przestrzeń, w której zachowana jest jak największa część całkowitej wariancji zawartej w danych. 
+
+Algorytm PCA przebiega następująco:
+
+- Standaryzujemy naszą macierz danych $X$, tak aby każda kolumna miała średnią $0$ i wariancję $1$,
+- Wyznaczamy macierz korelacj $XX^T$,
+- Wyznaczamy wektory i wartości własne macierzy $XX^T$,
+- Spośród wartości własnych wybieramy $k$ największych,
+- Dokonujemy projekcji na podprzestrzeń rozpiętą na odpowiadających im wektorach własnych.
+
+```{r}
+PCA_wine <- prcomp(wine_train[-14], scale = TRUE, center = TRUE)
+PCA_wine
+```
+```{r}
+PCA_wine_train_fits <- predict(PCA_wine, wine_train) 
+PCA_wine_fits <- predict(PCA_wine, wine_test)
+ggplot(PCA_wine_fits, aes(x = PC1, y = PC2, color = wine_test$Customer_Segment)) + geom_point() + labs(title = 'Wine test data in Principal Component Space', x = 'Principal component 1', y = 'Principal Component 2', color = 'Customer Segment')
+```
+
+Ważnym narzędziem do diagnozowania jaką część wariancji z danych wyjaśniamy biorąć odpowiednią ilość składowych głównych jest tzw. "scree plot". Tworzymy go następująco.
+
+```{r}
+variance_data <- sum(PCA_wine$sdev^2)
+screes <- PCA_wine$sdev^2 / variance_data
+pct_screes <- round(cumsum(screes),2)
+screes <- cbind(c(1:length(screes)),screes)
+colnames(screes) <- c('component', 'scree')
+ggplot(screes, aes(x = component, y = scree, label = pct_screes)) + geom_point() + geom_line() + geom_text(vjust = 1, hjust = 1) + scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.1)) + scale_x_continuous(breaks = 1:13, labels = 1:13) + labs(title = 'Scree plot for wine PCA', x = 'Number of component', y = '% of variance explained')
+```
+
+# Modele na danych o zredukowanym wymiarze
+
+Po przejściu do przestrzeni o zredukowanym wymiarze możemy oczywiście dopasować model do naszych danych, w celu chociażby klasyfikacji. Zastosujemy tutaj model klasy SVM i porównamy jego wyniki na danych bez redukcji wymiaru, z redukcją LDA i  z redukcją PCA.
+
+```{r}
+baseline <- e1071::svm(Customer_Segment ~. , data = wine_train, kernel = 'linear', type = 'C')
+confusionMatrix(data = predict(baseline, wine_test), reference = wine_test$Customer_Segment)
+```
+```{r}
+baseline <- e1071::svm(Customer_Segment ~ Alcohol + Flavanoids , data = wine_train, kernel = 'linear', type = 'C')
+confusionMatrix(data = predict(baseline, wine_test), reference = wine_test$Customer_Segment)
+```
+```{R}
+lda_svm <- e1071::svm(wine_train$Customer_Segment ~ wine_train_transform$x.LD1 + wine_train_transform$x.LD2, kernel = 'linear', type='C')
+lda_svm_preds <- predict(lda_svm, wine_test_transform[,c(5,6)])
+confusionMatrix(data = lda_svm_preds[1:88], reference = wine_test$Customer_Segment)
+```
+```{r}
+pca2_svm <- e1071::svm(wine_train$Customer_Segment ~ PCA_wine_train_fits[,1] + PCA_wine_train_fits[,2], kernel = 'linear', type = 'C')
+pca2_svm_preds <- predict(pca2_svm, PCA_wine_fits)
+confusionMatrix(data = pca2_svm_preds[1:88], reference = wine_test$Customer_Segment)
+```
+
+
+# Cwiczenie
+
+Wróćmy do danych *stars* z poprzednich zajęć. Zwizualizujmy je przy pomocy LDA i PCA, po czym dopasujemy modele klasyfikacji i porównamy ich wyniki.
+
+```{R}
+stars <- readr::read_csv('stars.csv') %>% dplyr::mutate(class = as.factor(class))
+stars <- stars[-c(1,9,10,12,13,17,18)]
+head(stars)
+```
+```{r}
+index <- caret::createDataPartition(stars$class, p=0.75, list = FALSE)
+stars_train <- stars[index,]
+stars_test <- stars[-index,]
+```

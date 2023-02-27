@@ -1,0 +1,189 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 10"
+subtitle: 'Krzywa ROC i klasyfikacja wieloklasowa' 
+author: 
+  name: 'Adrian Kowalski'
+  affiliation: 'Politechnika Krakowska'
+output: html_notebook
+---
+
+Wróćmy na chwilę do zbioru danych *breast* z poprzednich zajęć. Zbudujmy jakiś podstawowy, prosty model przewidujący złośliwość guza.
+
+```{r}
+library(tidyverse)
+library(caret)
+breast <- readr::read_csv('breast.csv')
+breast <- breast %>% dplyr::select(-c('id','...33')) %>% 
+          dplyr::mutate(diagnosis = ifelse(diagnosis == 'M', 1, 0)) %>%
+          dplyr::mutate(diagnosis = as.factor(diagnosis))
+unique(breast$diagnosis)
+```
+```{r}
+colnames(breast)
+```
+```{r}
+train_test_split <- createDataPartition(breast$diagnosis, list = FALSE, p=0.75)
+breast_train <- breast[train_test_split,]
+breast_test <- breast[-train_test_split,]
+```
+
+```{r}
+baseline_model <- glm(diagnosis ~ radius_mean + texture_mean, family = 'binomial', data = breast_train)
+summary(baseline_model)
+```
+Spójżmy teraz na wyniki tego klasyfikatora na zbiorze testowym. To na co tym razem zwrócimy uwagę, to wypływ reguły decyzyjnej na jakość klasyfikatora. Zacznijmy od standardowego odcięcia na poziomie $0.5$.
+
+```{r}
+fmpreds <- predict(baseline_model, breast_test, type = 'response')
+fmpreds_classes <- ifelse(fmpreds > 0.5, 1, 0)
+baseline_cm <- confusionMatrix(factor(fmpreds_classes), factor(breast_test$diagnosis))
+baseline_cm
+```
+Zauważmy, że ten konkretny przykład to zastosowanie medyczne. W tym wypadku chcielibyśmy jak najbardziej uniknąć błędu pierwszego rodzaju popełnianego przez nasz klasyfikator (przyporządkowanie obserwacji "pozytywnej" do klasy "negatywnej"). Innymi słowy, chcielibyśmy osiągnąć jak największą czułość modelu, byćmoże nawet kosztem dokładności.
+
+```{r}
+fmpreds_classes <- ifelse(fmpreds > 0.7, 1, 0)
+baseline_cm <- confusionMatrix(factor(fmpreds_classes), factor(breast_test$diagnosis))
+baseline_cm
+```
+Jak widać dobór reguły decyzyjnej ma istotny wpływ na nasz klasyfikator. Idealny klasyfikator jednak działałby dobrze niezależnie od reguły decyzyjnej. Możemy zatem porównać czułość i specyficzność naszego modelu w zależności od doboru reguły decyzyjnej do "idealnego" modelu.
+
+
+# Krzywa ROC
+
+Narzędzie, o którym mowa w powyższym akapicie nazywa się krzywą ROC (Receiver Operator Characteristic). Wywodzi się ono z teorii przetwarzania sygnałów i było pierwotnie używane do kalibrowania radarów. W naszym wypadku przyda się do oceny jakości klasyfikatora. Krzywą ROC budujemy obliczając czułość i specyficzność dla różnych reguł decyzyjynych. Później umieszczamy na płaszczyźnie punkty $(x_i,y_i)$, gdzie $y_i = sens_i$ jest czułością (TPR - true positive rate), dla $i$-tej reguły decyzyjnej, a $x_i = 1 - spec_i$ (FPR - false positive rate).   
+
+```{r}
+fmroc <- pROC::roc(response = breast_test$diagnosis, predictor = fmpreds)
+pROC::plot.roc(fmroc, response = breast_test$diagnosis, predictor = fmpreds, legacy.axes = TRUE)
+```
+```{r}
+pROC::ggroc(fmroc, legacy.axes = TRUE) + geom_abline(slope = 1, intercept = 0)
+```
+Warto zaznaczyć, po co rysujemy prostą $y = x$ na wykresie. Jeżeli punkt w powyższej przestrzeni leży na prostej $y=x$, to znaczy, że czułość i specyficzność są sobie równe. W takmi razie prosta $y=x$ jest krzywą ROC klasyfikatora losowo przydzielającego klasy i jest pewnym "punktem odniesienia", do którego możemy porównać ROC naszego klasyfikatora. Faktycznie
+
+```{r}
+random_classifier <- rep(0.5, 142)
+random_roc <- pROC::roc(response = breast_test$diagnosis, predictor = random_classifier)
+pROC::ggroc(random_roc, legacy.axes = TRUE)
+```
+
+
+### Pole pod krzywą ROC (AUC)
+
+Krzywa ROC daje nam wizualną (i nie tylko) informację o tym, jak dobrze radzi sobie nasz klasyfikator. Konkretną charakterystyką liczbową jaką możemy obliczyć na podstawie ROC jest AUC (area under the curve), czyli pole pod krzywą. Idealny klasyfikator osiągnąłby $AUC = 1$, ponieważ punkt $(0,1)$ należałby do krzywej ROC idealnego klasyfikatora (oznaczałoby to, że mamy czułość na poziomie $1$ i $0$ błędów). Sprawdźmy AUC dla naszego klasyfikatora.
+
+```{r}
+fmroc$auc
+```
+
+# Regresja logistyczna wielomianowa
+
+Naturalnym uogólnieniem regresji logistycznej jest regresja logistyczna wielomianowa (multinomial logistic regression). Służy ona do rozwiązywania problemów klasyfikacji wielomianowej, czyli takich, w których zmienna objaśniana przyjmuje więcej niż 2 klasy. Jedną z naszych klas wybieramy na tak zwaną klasę referencyjną, będzie ona pełnić rolę klasy $0$ ze zwykłego modelu regresji logistycznej. Dla zerowej klasy zakładamy, że
+
+\[ P(Y = 0 | X = X_i) = \frac{1}{1 + \sum_{j=1}^{k-1} e^{\beta_0 X_i}}, \]
+
+a dla pozostałych
+
+\[ \hat{p_j} := P(Y = y_j | X = X_i) = \frac{e^{\beta_jX_i}}{1 + e^{\beta_jX_i}}. \]
+
+W takim razie dostajemy, że nasz model jest ponownie liniowy po przekształceniu logitowym względem klasy referencyjnej, czyli
+
+\[ ln \frac{P(Y = y_j | X = X_i )}{P(Y = 0|X=X_i)} = \beta_jX_i. \]
+
+Jako funkcje straty ponownie używamy log-wiarygodności (bądź entropii krzyżowej), jedyną zmianą jest to, że musimy sumować po wszystkich klasach
+\[ \ell(\beta | X) = \sum_{i=1}^n \sum_{j=1}^k \mbox{I}_{\{y_i = j\}} ln \hat{p}_j. \]
+
+Uwaga: Wielomianową regresję logistyczną można też znaleźć pod nazwą regresja softmax (softmax regression). Wiąże się to z alternatywną formulacją, gdzie modelujemy
+\[ P(Y = y_j | X = X_i) = \frac{e^{\beta_jX_i}}{\sum_{m=1}^k e^{\beta_mX_i}}. \]
+Powyższa funkcja nosi nazwę funkcji softmax. Takie sformułowanie problemu regresji prowadzi do wniosku, że jedno z prawdopodobieństw da się wyprowadzić za pomocą pozostałych i tym samym do wzorów podanych wyżej.
+
+W *R* do budowania modelu regresji logistycznej wielomianowej służy funkcja *vglm(..., family = 'multinomial')* z pakietu *VGAM*. 
+
+```{r}
+stars <- readr::read_csv('stars.csv')
+stars <- stars %>% dplyr::mutate(class = ifelse(class == "QSO", 1, ifelse(class == "STAR", 2, 3))) %>% 
+          dplyr::mutate(class = as.factor(class))
+dim(stars)
+```
+```{r}
+unique(stars$class)
+```
+```{r}
+train_test_split <- createDataPartition(stars$class, list = FALSE, p=0.75)
+stars_train <- stars[train_test_split,]
+stars_test <- stars[-train_test_split,]
+```
+
+```{r}
+library(VGAM)
+stars_logistic <- vglm(class ~ u + g, data = stars_train, family = 'multinomial')
+summary(stars_logistic)
+```
+```{r}
+probs_logistic <- predict(stars_logistic, stars_test, type = 'response')
+head(probs_logistic)
+```
+```{r}
+predictions_logistic <- as.factor(apply(probs_logistic, 1, which.max))
+head(predictions_logistic)
+```
+```{r}
+caret::confusionMatrix(data = predictions_logistic, reference = as.factor(stars_test$class))
+```
+
+# Klasyfikator bayesowski
+
+Klasyfikator bayesowski jest teoretycznym klasyfikatorem, który minimalizuje ilość błędnych klasyfikacji (czyli maksymalizuje dokładność, patrz *ESL* rozdział 2.4). Jest to bardzo prosty klasyfikator, którego reguła decyzyjna ma postać
+
+\[ max_{y_i \in K} \, P(Y = y_i | X = X_i). \]
+
+W takim razie wybieramy dla $i$-tej obserwacji tą klasę, która maksymalizuje prawdopodobieństwo warunkowe. To podejście jednak ma bardzo duży mankament. W praktyce nie zdarza się sytuacja, w której znamy rozkład warunkowy $P(Y|X)$. Klasyfikator Bayesa jest zatem teoretycznym narzędziem, które służy do wyprowadzania innych klasyfikatorów, które będą go przybliżać. Zauważmy, że jednym z nich jest regresja logistyczna, gdzie zakładamy konkretną postać $P(Y = 1 | X = X_i) = \frac{1}{1 + e^{-\beta_0 - \beta X_i}}$.
+
+# Liniowa analiza dyskryminacyjna (LDA) Fischera
+
+Zauważmy, że prawdopodobieństwo warunkowe z klasyfikatora Bayesa możemy zapisać jako
+
+\[ P(Y = y_i | X = X_i) = \frac{P(Y = y_i)P(X = X_i| Y = y_i)}{\sum_{j=1}^k P(Y = y_j)P(X = X_i | Y = y_j)}. \]
+
+Każdą z wartości $P(Y = y_j)$ możemy oszacować ze zbioru treningowego jako $\frac{n_j}{n}$, gdzie $n_k$ to liczność $j$-tej klasy. Oznaczmy zatem $\pi_j = \frac{n_j}{n}$. Prawdopodobieństwo $P(X = X_i | Y = y_j)$ możemy natomiast zastąpić wiarygodnością i otrzymamy, że $P(X = X_i | Y = y_i) = f_{i}(X_i)$, gdzie $f_{i}$ to gęstość rozkładu $i$-tej klasy. Ostatecznie otrzymujemy, że
+\[ L(Y = y_i | X = X_i) = \frac{\pi_i f_i(X_i)}{\sum_{j=1}^k \pi_j f_j(X_i)}. \]
+
+Kożystając z tej postaci możemy otrzymać klasyfikator, który maksymalizuje wiarygodność $L$, dla konkretnej postaci funkcji $f_i$. Oczywiście pierwszym pomysłem jaki nasuwa się jest założenie, że \[ f_i(x) = \frac{1}{(2 \pi)^{p/2} det(\Sigma_i)^{\frac{1}{2}}} exp(-\frac{1}{2} (x - \mu_i)^T \Sigma^{-1} (x - \mu_i)). \] 
+Innymi słowy, zakładamy, że w każdej klasie wektor losowy $X$ ma wielowymiarowy rozkład normalny o średniej $\mu_k$ i macierzy kowariancji $\Sigma_i$. Taki model nazywa się kwadratową analizą dyskryminacyjną (QDA). W specjalnym przypadku, gdy dla dowolnego $k$ mamy $\Sigma_i = \Sigma$, gdzie $\Sigma$ jest pewną macierzą (oczywiście symetryczną, dodatnio określoną etc.) otrzymujemy liniową analizę dyskryminacyjną (LDA).
+
+Słowo "liniowy" w LDA wywodzi się z faktu, że obszary decyzyjne rozdzielane są hiperpłaszczyznami, natomiast w wypadku QDA obszary decyzyjne rozdzielane są paraboloidami. Faktycznie, spójżmy na iloraz wiarygodności dla dwóch różnych klas w wypadku LDA (zlogarytmowany, z oczywistych względów)
+
+\[ ln \frac{P(Y = y_i | X = x)}{P(Y = y_j| X = x)} = ln \frac{\pi_i}{\pi_j} - \frac{1}{2}(\mu_i + \mu_j)\Sigma^{-1}(\mu_i - \mu_j) + x^T \Sigma^{-1} (\mu_i - \mu_j). \]
+
+Granicę decyzyjną wybieramy tam, gdzie $P(Y = y_i| X = X_i) = P(Y = y_j)$, czyli gdzie powyższe wyrażenie się zeruje, a takie wyrażenie jest liniowe względem obserwacji $x$, zatem granice decyzyjne są hiperpłaszczyznami. Równoważnie możemy zdefiniować
+\[ \delta_i(x) = x^T \Sigma^{-1}\mu_i - \frac{1}{2} \mu_i^T \Sigma^{-1} \mu_i + ln \pi_i  \]
+i podjąć decyzję za pomocą reguły $argmax_{i \in \{ 1, \dots, k\}} \delta_i(x)$.
+
+W wypadku QDA powyższe wyrażenie się komplikuje, ze względu na brak założenia o takiej samej macierzy kowariancji dla każdej klasy. Można wyprowadzić funkcje dyskryminacjyne dla QDA, które przyjmują postać 
+\[ \delta_i(x) = - \frac{1}{2}ln (\mbox{det}\Sigma_k) - \frac{1}{2}(x - \mu_i)^T\Sigma_k^{-1}(x - \mu_i) + ln \pi_i. \]
+
+W *R* do przeprowadzenia LDA i QDA używamy funkcji *LDA()* i *QDA()* z biblioteki *MASS*.
+```{r}
+library(MASS)
+```
+
+```{r}
+star_lda <- lda(class ~ u + g, data = stars_train)
+star_pred <- predict(star_lda, stars_test)
+caret::confusionMatrix(as.factor(stars_test$class), as.factor(star_pred$class))
+```
+
+```{r}
+library(klaR)
+klaR::partimat(as.factor(class) ~ u + g, data = dplyr::sample_n(stars_train, 200), method = 'lda', prec = 500)
+```
+
+```{r}
+klaR::partimat(as.factor(class) ~ u + g, data = dplyr::sample_n(stars_train, 200), method = 'qda', prec = 500)
+```
+
+
+# Cwiczenie
+
+Stwórz najlepszy model do klasyfikacji rodzaju ciał niebieskich ze zbioru danych *stars* (przy użyciu LDA, QDA i regresji logistycznej).

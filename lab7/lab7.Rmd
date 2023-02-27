@@ -1,0 +1,106 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 7"
+author:
+  name: Adrian Kowalski
+  affiliation: Politechnika Krakowska
+subtitle: Dwuczynnikowa analiza wariancji
+output:
+  html_document:
+    df_print: paged
+---
+
+# Dwuczynnikowa analiza wariancji
+
+Do tej pory wykonywaliśmy testy za pomocą jednoczynnikowej analizy wariancji, która pozwalała nam porównywać grupy na podstawie jednej kategoryzacji. Na dzisiejszych zajęciach poznamy rozszerzenie tej metody, dwuczynnikową analizę wariancji (Two-way ANOVA). Pozwala nam ona badać zależność średniej między zbiorami pogrupowanymi względem dwóch zmiennych kategoryzjuących oraz badania interakcji między kategoriami. W podstawowym modelu dwuczynnikowej analizy wariancji mamy następujące założenia
+
+* próby wewnątrz grup mają rozkład normalny,
+* wszystkie próby wewnątrz grup mają stałą i jednakową wariancję,
+* próby są niezależne.
+
+Tym razem będziemy chcieli rozbić całkowitą sumę kwadratów z danych na 4 części:
+\[ SST = SSA + SSB + SSAB + SSE. \]
+Oznaczmy przez 
+
+* $r$ ilośc kategorii czynnika 1,
+* $c$ ilość kategorii czynnika 2,
+* $n'$ liczność danej grupy,
+* $n$ liczność całej próby,
+* $x_ijk$ to $k$-ta obserwacja z poziomu $i$ czynnika 1, poziomu $j$ czynnika 2.
+
+Wtedy wprowadzamy
+
+* $SST = \sum_{i=1}^r \sum_{j=1}^c \sum_{k=1}^{n'} (x_{ijk} - \overline{x})^2$ jest całkowitą sumą kwadratów w danych,
+* $SSA = cn'\sum_{i=1}^r (\overline{x}_i - \overline{x})^2$ jest sumą kwadratów w obserwacjach względem pierwszego czynnika,
+* $SSB = rn'\sum_{j=1}^c (\overline{x}_j - \overline{x})^2$ jest sumą kwadratów w obserwacjach względem drugiego czynnika,
+* $SSAB = n' \sum_{i=1}^r \sum_{j=1}^c (\overline{x}_{ij} - \overline{x}_i - \overline{x}_j + \overline{x})^2$ jest sumą kwadratów wynikającą z interakcji,
+* $SSE = \sum_{i=1}^r \sum_{j=1}^c \sum_{k=1}^{n'} (x_{ijk} - \overline{x}_{ij})^2$ to suma kwadratów reszt.
+
+Do wyliczenia statystyki $F$ potrzebujemy wartości średnich powyższych błędów, wyliczamy je jako
+
+* $MSA = \frac{SSA}{r-1}$,
+* $MSB = \frac{SSB}{c-1}$,
+* $MSAB = \frac{SSAB}{(r-1)(c-1)}$,
+* $MSE = \frac{SSE}{rc(n'-1)}$.
+
+Wtedy dla czynnika 1 mamy $F = \frac{MSA}{MSE}$, dla czynnika 2 mamy $F = \frac{MSB}{MSE}$ i dla interakcji $F = \frac{MSAB}{MSE}$. W razie odrzucenia którejś z hipotez zerowych możemy przeprowadzić procedurę Tukeya, lub testy t z poprawką Bonferoniego do wnioskowania post-hoc. 
+
+W $R$ do dwukierunkowej analizy wariancji nadal służy funkcja $aov()$. Wprowadźmy dane "Diet" dotyczące wagi osób, które testowały różne diety.
+
+```{r}
+library(tidyverse)
+diet <- readr::read_csv('diet.csv')
+head(diet)
+```
+
+Zauważmy, że w czystych danych mamy jedynie wagę przed i wagę po eksperymencie. Musimy jeszcze wytworzyć zmienną dotyczącą zmiany w wadze po eksperymencie.
+
+```{r}
+diet <- diet %>% dplyr::mutate(weightLoss = weight6weeks - pre.weight) %>% dplyr::mutate(gender = as.factor(gender)) %>% dplyr::mutate(Diet = as.factor(Diet))
+head(diet)
+```
+
+W danych mamy dwie zmienne, które możemy wykorzystać jako czynniki - płeć i rodzaj diety. Zastanówmy się na chwilę, czy nie moglibyśmy jeszcze skorzystać ze zmiennej wiek jako czynnik. W tym celu przeprowadzimy proces tzw. koszykowania (bucketing).
+
+```{r}
+table(diet$Age)
+```
+```{r}
+quantile(diet$Age)
+```
+
+```{r}
+ggplot(diet, aes(x=Age)) + geom_histogram(bins = 10)
+```
+
+```{r}
+diet <- diet %>% dplyr::mutate(ageGrp = cut(Age, breaks=c(15,35,45,60)))
+head(diet)
+```
+
+```{r}
+table(diet$ageGrp)
+```
+
+Teraz ze zmiennej liczbowej Age stworzyliśmy zmienną kategorialną ageGrp i możemy ją wykorzystać w analizie wariancji. Przejdźmy do wykresów, które pomogą w interpretacji wizualnej danych,
+
+```{r}
+ggplot(diet, aes(x=gender, y=weightLoss)) + geom_boxplot() + facet_wrap(~Diet)
+```
+
+```{r}
+ggplot(diet, aes(x=Diet, y=weightLoss, color=gender, group=gender)) + stat_summary(fun=mean, geom = 'point') + stat_summary(fun=mean, geom='line')
+```
+```{r}
+summary(aov(weightLoss ~ Diet*ageGrp*gender, data=diet))
+```
+
+
+# Ćwiczenie
+
+W pliku 'halo1.dat' znajdują się dane pochodzące z badania na temat efektu aureoli. Mamy dwa czynniki - "jakość eseju" i "atrakcyjność autora" i jedną zmienną objaśnianą - "ocenę". Eseje dzielimy na "dobre - 1" i "złe - 2", atrakcyjność dzielimy na "1 - wysoką, 2 - grupa kontrolna, 3 - niewysoką". Przy pomocy analizy wariancji stwierdzić czy czynniki mają wypływ na wynik. (Dane pochodzą z [źródła](https://users.stat.ufl.edu/~winner/datasets.html), tam też można znaleźć ich opis pod nazwą "Beauty and Judgement - Halo Effect" jak i odnośniki do oryginalnego badania).
+
+```{r}
+halo <- readr::read_table('halo1.dat', col_names = c('essay_quality', 'attractiveness', 'score'))
+halo <- halo %>% dplyr::mutate(essay_quality = as.factor(essay_quality)) %>% dplyr::mutate(attractiveness = as.factor(essay_quality))
+head(halo)
+```
