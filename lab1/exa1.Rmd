@@ -21,20 +21,21 @@ Istnieje dokładne rozwiązanie tego problemu i jest ono dane za pomocą wzorów
 $$ \begin{array}{ll} \beta_1 = \frac{\sum_{i=1}^n (x_i - \overline{x})(y_i - \overline{y})}{\sum_{i=1}^n (x_i - \overline{x})^2}  \\ \hat{\beta_0} = \overline{y} - \beta_1\overline{x} \end{array} $$
 
 # Regresja liniowa prosta w R
-
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+```
 
 W R do dopasowywania modeli regresji liniowej prostej służy funkcja lm(). Zobaczmy jej działanie na prostym przykładzie.
 
 ```{r}
-x <- 1:10
-data_line <- 2*(x)+3
+data_line <- tibble(points=1:10) %>% mutate(line=2*points+3)
 
-plot(data_line, type='l', main='Prosta y=2x+3', xlab='x', ylab='y')
+ggplot(data_line, aes(x=points, y=line)) + geom_line() + geom_point() + ggtitle('Wykres funkcji y=2x+3')
 ```
 Powyżej zdefiniowaliśmy zbiór punktów leżących na prostej, spodziewamy się więc, że model regresji liniowej dopasuje do nich dokładnie tą prostą. Dopasowywujemy więc model do danych, składnia polecenia lm() wymaga od nas podania wyrażenia typu "formula" w postaci $y \sim x$. Obiekt, który zwraca funkcja lm() przypisujemy do zmiennej i możemy wywołać na nim funkcje summary(), która zwraca informacje o dopasowaniu.
 
 ```{r}
-first_model <- lm(data_line ~ x)
+first_model <- lm(line ~ points, data=data_line)
 first_model_summary <- summary(first_model)
 first_model_summary
 
@@ -94,27 +95,23 @@ Wskaźnik determinacji $R^2$ interpretujemy jako ułamek wariancji w danych, kt�
 
 Skomplikujmy teraz nasz model, dodając do danych szum losowy.
 ```{r}
-data_line_noise <- data_line + rnorm(10)
-plot(data_line_noise, main='Prosta y=2x+3 z szumem', xlab='x', ylab='y')
-abline(3,2)
+data_line <- data_line %>% mutate(rv=rnorm(10)) %>% mutate(line_rv=line+rv)
+
+ggplot(data_line, aes(x=points, y=line_rv)) + geom_line(aes(x=points, y=line)) + geom_point() + ggtitle('Wykres funkcji y=2x+3 z szumem N(0,1)')
 ```
 Dopasujmy do naszych nowo wygenerowanych danych model regresji liniowej prostej.
 ```{r}
-second_model <- lm(data_line_noise ~ x)
+second_model <- lm(line_rv ~ points, data=data_line)
 second_model_summary <- summary(second_model)
 second_model_summary
 ```
 Zwiększmy ilość danych, do których dopasowujemy model.
 ```{r}
-x_large <- 1:100
-data_line_large <- 2*(x_large)+3 + rnorm(100)
-data_line_frame <- cbind(x_large, data_line_large)
-data_line_frame <- data_line_frame[sample(100, 50, replace=FALSE),]
-plot(data_line_frame, main='Prosta y=2x+3 z szumem', xlab='x', ylab='y')
-abline(3,2)
+data_line_large <- tibble(points=1:100) %>% mutate(rv=rnorm(100)) %>% mutate(line=2*points+3) %>% mutate(line_rv=line+rv)
+ggplot(data_line_large, aes(x=points, y=line_rv)) + geom_point() + geom_line(aes(x=points, y=line)) + ggtitle("Wykres prostej 2x+3 z szumem N(0,1) dla 100 punktów")
 ```
 ```{r}
-third_model <- lm(data_line_large ~ x_large)
+third_model <- lm(line_rv ~ points, data=data_line_large)
 third_model_summary <- summary(third_model)
 third_model_summary
 ```
@@ -145,12 +142,19 @@ houses_summary
 ```
 Zobaczmy, czy możemy ulepszyć powyższy model. W tym celu sprawdźmy rozkład ceny, za pomocą histogramu.
 ```{r}
-hist(houses$price_ua, main='Histogram ceny za metr kwadratowy mieszkania', xlab='Cena w $', ylab='Częstotliwość')
+quantile(houses$price_ua)
 ```
-To co można od razu zauważyć z histogramu to istnienie wartości odstającej, której w celu poprawienia jakości modelu się pozbędziemy. Spójrzmy jeszcze na histogram odległości.
 
 ```{r}
-hist(houses$nearest_mrt_distance, main='Histogram odległości od węzła komunikacyjnego', xlab='Odległość w metrach', ylab='Częstotliwość')
+ggplot(houses, aes(x=price_ua)) + geom_histogram(binwidth = 1000) + ggtitle('Histogram ceny za jedną jednostke powierzchni mieszkania') + xlab("Cena w dolarach") + ylab("Ilość")
+```
+To co można od razu zauważyć z histogramu to istnienie wartości odstającej, której w celu poprawienia jakości modelu się pozbędziemy. Spójrzmy jeszcze na histogram odległości.
+```{r}
+quantile(houses$nearest_mrt_distance)
+```
+
+```{r}
+ggplot(houses, aes(x=nearest_mrt_distance)) + geom_histogram(binwidth=500) + ggtitle("Histogram odległości od najbliższej stacji transportu masowego") + xlab("Odległóść w metrach") + ylab("Ilość")
 ```
 Mamy tutaj bardo dużo obserwacji o niskich wartościach i coraz mniej o coraz większych. Innymi słowy histogram ma charakter rozkładu wykładniczego. W celu poprawienia skali zastosujemy dla tej zmiennej trasformacje logarytmem. Poniżej badamy jeszcze kwantyle naszej ceny, aby odrzucić skrajne obserwacje.
 
@@ -158,7 +162,7 @@ Mamy tutaj bardo dużo obserwacji o niskich wartościach i coraz mniej o coraz w
 ```{r}
 c(quantile(houses$price_ua, 0.05), quantile(houses$price_ua, 0.95))
 ```
-```{r}
+```{r, echo=FALSE}
 houses2 <- houses %>% dplyr::filter(price_ua > quantile(houses$price_ua, 0.05)) %>% dplyr::filter(price_ua < quantile(houses$price_ua, 0.95))
 ```
 
