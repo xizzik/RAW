@@ -1,12 +1,15 @@
 ---
-title: "Regresja i analiza wariancji - Laboratorium 1"
+title: "Regresja i analiza wariancji - Laboratorium 3"
 author:
   name: Adrian Kowalski
   affiliation: Politechnika Krakowska
 subtitle: Regresja liniowa wieloraka - wprowadzenie
 output:
   html_document:
+    theme: readable
     df_print: paged
+    toc: true
+    toc_float: true
 ---
 
 # Model regresji liniowej wielorakiej
@@ -35,11 +38,11 @@ Biorąc pod uwagę wprowadzone oznaczenia, nasz model w skrótowej formie przyjm
 
 # Wyznaczenie współczynników modelu liniowego
 
-W celu wyznaczenia ogólnego wzoru na współczynniki modelu regresji liniowej wielorakiej możemy postąpić tak jak poprzednio, po przez minimalizacje błędu średniokwadratowego. Takie rozumowanie prowadzi chociażby autor [tutaj](http://home.iitk.ac.in/~shalab/regression/Chapter3-Regression-MultipleLinearRegressionModel.pdf). Można też wyprowadzić ten wzór za pomocą rozkładu SVD macierzy tak jak robią to autorzy [tutaj](http://databookuw.com/databook.pdf). My skorzystamy ze wzoru na tzw. (lewą) pseudo-odwrotność Moora-Penrose'a $$ X^\dagger = (X^TX)^{-1}X^T$$
+W celu wyznaczenia ogólnego wzoru na współczynniki modelu regresji liniowej wielorakiej możemy postąpić tak jak poprzednio, po przez minimalizacje błędu średniokwadratowego. Takie rozumowanie prowadzi chociażby autor [tutaj](http://home.iitk.ac.in/~shalab/regression/Chapter3-Regression-MultipleLinearRegressionModel.pdf). Można też wyprowadzić ten wzór za pomocą rozkładu SVD macierzy tak jak robią to autorzy [tutaj](http://databookuw.com/databook.pdf). My skorzystamy ze wzoru na tzw. (lewą) pseudo-odwrotność Moora-Penrose'a $$ X^\dagger = (X^TX)^{-1}X^T.$$
 Jej zastosowanie daje nam wzór na współczynniki $$ (X^TX)^{-1}X^T\boldsymbol{y} = \beta. $$
-Wstawiamy ten wzór do modelu i otrzymujemy $$ \hat{y} = X(X^TX)^{-1}X^T\boldsymbol{y} $$
+Wstawiamy ten wzór do modelu i otrzymujemy $$ \hat{y} = X(X^TX)^{-1}X^T\boldsymbol{y}. $$
 
-Macierz $$ H := X(X^TX)^{-1}X^T$$ nazywa się czasem hat matrix.
+Macierz $$ H := X(X^TX)^{-1}X^T$$ nazywa się czasem *hat matrix*.
 
 # Założenia modelu regresji wielorakiej
 
@@ -80,7 +83,7 @@ Innymi słowy, wysoka $p$-wartość testu $F$ świadczy o tym, że nasz model ma
 # Ćwiczenie: Model wyceny używanych aut
 
 Skorzystamy z danych [CARS DATASET (Audi, BMW, Ford, Hyundai, Skoda, VW)](https://www.kaggle.com/aishwaryamuthukumar/cars-dataset-audi-bmw-ford-hyundai-skoda-vw). Na podstawie tych danych zbudujemy różne modele regresji liniowej wielorakiej i porównamy je między sobą przy pomocy skorygowanego $R^2$.
-```{r}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
 cars <- readr::read_csv('cars_dataset.csv')
 cars <- cars %>% dplyr::mutate(year = 2022 - year) %>% dplyr::rename(age = year)
