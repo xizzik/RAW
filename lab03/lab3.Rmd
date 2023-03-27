@@ -1,0 +1,224 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 3"
+author:
+  name: Adrian Kowalski
+  affiliation: Politechnika Krakowska
+subtitle: Regresja liniowa wieloraka - wprowadzenie
+output:
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: true
+    toc_float: true
+---
+
+# Model regresji liniowej wielorakiej
+
+Do tej pory rozważaliśmy model regresji liniowej prostej $$ y_i = \beta_0 + \beta_1 x_i + \epsilon_i. $$
+W rzeczywistości występuje bardzo mało zależności, które da się opisać za pomocą dokładnie jednej zmiennej objaśniającej. Uogólnimy nasze podejście do regresji liniowej wprowadzając nowe zmienne objaśniające i sprowadzając model do postaci.
+$$ y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + \beta_k x_{ik} + \varepsilon_i.$$
+Gdzie $\varepsilon_i$ nadal będą zmiennymi losowymi o rozkładzie $N(0,\sigma^2)$ dla pewnej stałej wariancji $\sigma^2$. Wszelkie pozostałe założenia modelu, które poczyniliśmy przy regresji liniowej prostej pozostają, dojdzie natomiast dodatkowe założenie wynikające z postaci współczynników. Standardowo będziemy oznaczać tak jak poprzednio $$ \hat{y_i} = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + \beta_k x_{ik}$$
+
+# Macierzowa postać modelu regresji
+
+Podobnie jak w przypadku regresji liniowej prostej będziemy chcieli zminimalizować błąd średniokwadratowy naszego estymatora. W tym wypadku natomiast przybiera on nieco inną postać
+$$ MSE = \frac{\sum_{i=1}^n \varepsilon_i^2}{n - (k + 1)} = \frac{\sum_{i=1}^n (y_i - \hat{y}_i )^2}{n - (k+1)} = \frac{\sum_{i=1}^n (y_i - \beta_0 - \beta_1x_{i1} - \dots - \beta_k x_{ik} )^2}{n - (k+1)}$$
+W tym celu spojrzymy na nasz model z nieco innej perspektywy. Spójrzmy jeszcze raz na równanie regresji $$ y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + \beta_k x_{ik} + \varepsilon_i. $$
+Dla dowolnego ustalonego $i$ możemy je zapisać w formie $$ y_i = [1, x_{i1}, x_{i2}, \dots, x_{ik}]\left[\begin{array}{c} \beta_0 \\ \beta_1 \\ \dots \\ \beta_k \end{array} \right] + \varepsilon_i.$$
+
+Dzięki tej formie zapisu możemy spojrzeć teraz na model całościowo, uwzględniając na raz wszystkie dane.
+$$\left[\begin{array}{c} y_1 \\ y_2 \\ \dots \\ y_n \end{array} \right] = \left[\begin{array}{c} 1 \; x_{11} \; \dots x_{1k} \\ 1 \; x_{21} \; \dots \; x_{2k} \\ \dots \\ 1 \; x_{n1} \; \dots \; x_{nk}  \end{array} \right] \left[\begin{array}{c} \beta_0 \\ \beta_1 \\ \dots \\ \beta_k \end{array} \right] + \left[\begin{array}{c} \varepsilon_1 \\ \varepsilon_2 \\ \dots \\ \varepsilon_n \end{array} \right]. $$
+Od tej pory będziemy używać zapisu skrótowego
+$$ \boldsymbol{y}  = \left[\begin{array}{c} y_1 \\ y_2 \\ \dots \\ y_n \end{array} \right] $$
+$$ \boldsymbol{X} = \left[\begin{array}{c} 1 \; x_{11} \; \dots x_{1k} \\ 1 \; x_{21} \; \dots \; x_{2k} \\ \dots \\ 1 \; x_{n1} \; \dots \; x_{nk}  \end{array} \right] $$
+
+$$ \boldsymbol{\beta} = \left[\begin{array}{c} \beta_0 \\ \beta_1 \\ \dots \\ \beta_k \end{array} \right] $$
+$$ \boldsymbol{\varepsilon} = \left[\begin{array}{c} \varepsilon_1 \\ \varepsilon_2 \\ \dots \\ \varepsilon_n \end{array} \right]$$
+Biorąc pod uwagę wprowadzone oznaczenia, nasz model w skrótowej formie przyjmuje postać $$ \boldsymbol{y} = \boldsymbol{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}. $$
+
+# Wyznaczenie współczynników modelu liniowego
+
+W celu wyznaczenia ogólnego wzoru na współczynniki modelu regresji liniowej wielorakiej możemy postąpić tak jak poprzednio, po przez minimalizacje błędu średniokwadratowego. Takie rozumowanie prowadzi chociażby autor [tutaj](http://home.iitk.ac.in/~shalab/regression/Chapter3-Regression-MultipleLinearRegressionModel.pdf). Można też wyprowadzić ten wzór za pomocą rozkładu SVD macierzy tak jak robią to autorzy [tutaj](http://databookuw.com/databook.pdf). My skorzystamy ze wzoru na tzw. (lewą) pseudo-odwrotność Moora-Penrose'a $$ X^\dagger = (X^TX)^{-1}X^T.$$
+Jej zastosowanie daje nam wzór na współczynniki $$ (X^TX)^{-1}X^T\boldsymbol{y} = \beta. $$
+Wstawiamy ten wzór do modelu i otrzymujemy $$ \hat{y} = X(X^TX)^{-1}X^T\boldsymbol{y}. $$
+
+Macierz $$ H := X(X^TX)^{-1}X^T$$ nazywa się czasem *hat matrix*.
+
+# Założenia modelu regresji wielorakiej
+
+Zauważmy, że chociażby z faktu, że wykorzystujemy macierz $(X^TX)^{-1}$, ta odwrotność musi istnieć. Musimy zatem dołożyć kolejne założenie do naszej klasycznej listy założeń, mówiące o pełnym rzędzie kolumnowym macierzy $X$, co przekłada się po prostu na brak struktury zależności między zmiennymi objaśniającymi $x_1, x_2, \dots, x_k$. Podsumowując, wykorzystując zapis macierzowy, nasze założenia to
+
+- liniowa zależność między zmienną objaśnianą, a objaśniającą postaci $\boldsymbol{y} = \boldsymbol{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}$,
+
+- wektor losowy $\varepsilon$ ma średnią $\boldsymbol{0}$,
+
+- wektor losowy $\varepsilon$ ma macierz kowariancji postaci $\sigma^2 \boldsymbol{I}$, gdzie $\sigma^2$ to pewna liczba rzeczywista,
+
+- zmienne losowe $\varepsilon_i, \varepsilon_j$ są ze sobą niezależne, dla różnych $i,j$,
+
+- wektor losowy $\varepsilon$ ma wielowymiarowy rozkład normalny $N(0, \sigma^2 \boldsymbol{I})$,
+
+- rzadna ze zmiennych objaśniających nie jest kombinacją liniową pozostałych, innymi słowy, zmienne objaśniające są liniowo niezależne, a macierz $X$ jest pełnego rzędu kolumnowego.
+
+
+O jakości estymatora, który wyznaczyliśmy w poprzednim rozdziale w sytuacji, gdy powyższe założenia są spełnione mówi twierdzenie [Gaussa-Markowa](https://en.wikipedia.org/wiki/Gauss%E2%80%93Markov_theorem).
+
+# Współczynnik determinacji $R^2$.
+
+Podobnie jak w przypadku regresji liniowej prostej, możemy w celu oceny jakości modelu skorzystać z współczynnika determinacji $R^2$. Ma on niestety poważną wadę w przypadku regresji liniowej wielorakiej. Przypomnijmy 
+
+$$ R^2 = 1 - \frac{\sum_{i=1}^n \varepsilon_i^2}{\sum_{i=1}^n(y_i - \overline{y})^2}.$$
+
+Dodanie kolejnej zmiennej do modelu nigdy nie podniesie sumy kwadratów reszt, może ją tylko zmniejszyć lub nie zmienić. Zatem $R^2$ będzie większe im więcej zmiennych dodamy do modelu, co nie koniecznie będzie świadczyć o większej jakości modelu. Aby z tym walczyć wprowadzamy tzw. skorygowane $R^2$ (adjusted $R^2$ dane wzorem 
+$$ R^2 = 1 - \frac{n - 1}{n - (k+1)}(1 - R^2). $$
+
+Skorygowane $R^2$ bierze pod uwagę jakość modelu i ilość zmiennych objaśniających, więc może być używane do porówynywania różnych modeli.
+
+# Statystyka F
+
+Wywołując summary() na danym modelu regresji liniowej otrzymujemy również wartość statystyki testowej $F$ dla tego modelu. Statystyka ta jest ściśle związana z analizą wariancji i będziemy o niej jeszcze mówić, natomiast warto teraz wspomnieć o hipotezach testu, który ta statystyka wykonuje.
+$$ \begin{array}{ll} H_0: & \beta_1 = \beta_2 = \dots = \beta_k = 0 \\ H_1: & \exists_{k} \;  \beta_k \neq 0 \end{array} $$
+Innymi słowy, wysoka $p$-wartość testu $F$ świadczy o tym, że nasz model ma wyłącznie zerowe współczynniki.
+ 
+# Ćwiczenie: Model wyceny używanych aut
+
+Skorzystamy z danych [CARS DATASET (Audi, BMW, Ford, Hyundai, Skoda, VW)](https://www.kaggle.com/aishwaryamuthukumar/cars-dataset-audi-bmw-ford-hyundai-skoda-vw). Na podstawie tych danych zbudujemy różne modele regresji liniowej wielorakiej i porównamy je między sobą przy pomocy skorygowanego $R^2$.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+cars <- readr::read_csv('cars_dataset.csv')
+cars <- cars %>% dplyr::mutate(year = 2022 - year) %>% dplyr::rename(age = year)
+cars_sample <- dplyr::sample_n(cars, 1000)
+cars_sample <- cars_sample %>% mutate(random_col = rnorm(1000, mean = 3, sd = 0.5))
+head(cars_sample)
+```
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+cars_sample <- cars_sample %>% dplyr::filter((fuelType!='Hybrid')&(fuelType!='Other')&(fuelType!='Electric'))
+```
+
+Zacznijmy od modelu, który przewiduje cenę za pomocą wieku auta.
+```{r, echo=FALSE}
+MAE <- function(y_actual, y_predicted){
+  return(mean(abs(y_actual - y_predicted)))
+}
+MAPE <- function(y_actual, y_predicted){
+  return(mean(abs((y_actual-y_predicted)/y_actual))*100)
+}
+RMSE <- function(y_actual, y_predicted){
+  return(sqrt(mean((y_actual-y_predicted)^2)))
+}
+```
+
+```{r, echo=FALSE}
+library(broom)
+
+model_summary <- function(model, test_data, test_y){
+  model_glance <- broom::glance(model)
+  model_augment <- broom::augment(model)
+  train_mae <- mean(abs(model_augment$.resid))
+  train_mape <- mean(abs(model_augment$.resid/dplyr::pull(model_augment, var=1)))*100
+  predicted_y <- predict(model, test_data)
+  test_rmse <- sqrt(mean((test_y - predicted_y)^2))
+  test_mae <- mean(abs(test_y - predicted_y))
+  test_mape <- mean(abs((test_y - predicted_y)/test_y))*100
+  print("Wartośći charakterystyk liczbowych modelu.")
+  print("------------------------------------------")
+  cat("Treningowe R^2 wyniosło: ", model_glance$r.squared, "\n",
+  "Treningowe \"poprawione\" R^2 wyniosło: ", model_glance$adj.r.squared, "\n",
+  "Kryterium informacyjne Akaikego (AIC) wyniosło: ", model_glance$AIC, "\n",
+  "---------------------------------------------", "\n",
+  "Charakterystyki \"out-of-sample\"", "\n",
+  "Charakterystyka |   train  |   test   | \n", 
+  "RMSE wyniosło:  |", model_glance$sigma, "|", test_rmse , "|", "\n",
+  "MAE wyniosło:   |", train_mae, "|",  test_mae, "|" , "\n",
+  "MAPE wyniosło:  |", round(train_mape,2), "%|", round(test_mape,2), "%|",  "\n")
+}
+```
+
+
+```{r}
+library(caret)
+split <- createDataPartition(cars_sample$price, p=0.75, list=FALSE)
+cars_sample_train <- cars_sample[split,]
+cars_sample_test <- cars_sample[-split,]
+```
+
+```{r}
+cars_model <- lm(price ~ age, data = cars_sample_train)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+Spróbujmy poprawić jakość modelu wykorzystując eksploracyjną analizę danych. Zbadajmy histogram zmiennej objaśniającej w celu określenia charakteru jej rozkładu.
+
+```{r}
+ggplot(cars_sample_train, aes(x = age)) + geom_histogram(bins = 10)
+```
+Zmienna objaśniająca ma bardzo mało obserwacji w prawym ogonie, spróbujmy złagodzić wpływ tego efektu dokonując transformacji logarytmem.
+
+```{r}
+cars_model <- lm(price ~ log(age), data=cars_sample_train)
+summary(cars_model)
+```
+
+Bez narażania się na przeuczenie naszego modelu ciężko jest znaleźć dodatkowe transformacje, które ulepszą nasz model. Zbadajmy jeszcze jego charakterystyki liczbowe.
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+
+#Model drugi
+
+W takim razie najprostszym kolejnym krokiem jaki możemy podjąć jest dodanie kolejnych zmiennych do modelu!
+
+```{r}
+cars_model <- lm(price ~ log(age)+mpg, data=cars_sample_train)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+Dodanie zmiennej na pewno znacznie i korzystnie wpłynęło na jakość modelu pod wieloma względami. Należy niestety jednak uważać i badać z jakich w zasadzie charakterystyk liczbowych modelu korzystamy w celu określenia jego jakości. Dodajmy teraz do modelu kolumne szumu losowego, w żaden sposób nie skorelowanego ze zmienną objaśnianą.
+
+# Model z losową kolumną
+
+```{r}
+bad_cars_model <- lm(price ~ log(age) + random_col, data=cars_sample_train)
+summary(bad_cars_model)
+```
+```{r}
+model_summary(bad_cars_model, cars_sample_test, cars_sample_test$price)
+```
+Wniosek: Dodawanie kolejnych zmiennych NIGDY nie pogorszy jakości modelu! Nie zatrzymujmy się na dwóch zmiennych, dodajmy trzecią zmienną do modelu *cars_model*.
+
+# Model trzeci
+
+```{r}
+cars_model <- lm(price ~ log(age)+mpg+engineSize, data=cars_sample_train)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+# Model czwarty
+
+Dodajmy kolejną zmienną i zaobserwujmy jej wpływ na jakość modelu.
+```{r}
+cars_model <- lm(price ~ log(age)+mpg+engineSize+mileage, data=cars_sample)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+# Macierz korelacji
+
+Głównym narzędziem, które pomaga nam badać, które zmienne przydadzą się w znaczny sposób w modelu jest macierz korelacji. Pomaga ona również wykryć kolinearność zmiennych objaśniających, która oczywiście jest niekorzystna. Macierz korelacji najczęściej przedstawiamy w formie graficznej.
+```{r}
+cars_sample_cormat <- round(cor(cars_sample[,c(2,3,5,7,8,9)]),2)
+cars_sample_cormat
+```
+
+
+```{r}
+library(ggcorrplot)
+ggcorrplot(cars_sample_cormat, type='lower')
+```
