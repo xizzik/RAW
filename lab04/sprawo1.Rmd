@@ -1,0 +1,32 @@
+---
+title: "Regresja i analiza wariancji - Sprawozdanie 1"
+subtitle: 'Regresja liniowa - sprawozdanie' 
+author: 
+  name: 'Adrian Kowalski'
+  affiliation: 'Politechnika Krakowska'
+output: html_notebook
+---
+
+# Termin oddania sprawozdania : 9.12.2022
+
+
+# Zadanie 1
+
+Zaimportuj zbiór danych Carseats z biblioteki ISLR i dopasuj model (lub modele) regresji liniowej prostej przewidujący wartość zmiennej Sales. Zmienną objaśniającą dobierz według znanych metod (współczynnik korelacji, wykresy). Oceń jakość modelu ($R^2$, błąd standardowy) i zweryfikuj założenia (analiza reszt).
+
+```{r}
+library(tidyverse)
+library(ISLR)
+carseats <- tibble::as.tibble(ISLR::Carseats)
+head(carseats)
+```
+Wskazówka: Po zaimportowaniu biblioteki ISLR informacje o danych Carseats można znaleźć wpisując w konsoli "?ISLR::Carseats".
+```{r}
+?ISLR::Carseats
+```
+
+
+# Zadanie 2
+
+Dopasuj model (lub modele) regresji liniowej wielorakiej przewidujący wartość zmiennej Sales. Model zbuduj w wybrany przez siebie sposób. Oceń jakość modelu i spełnienie założeń. Porównaj otrzymane modele z modelem regresji liniowej prostej. 
+

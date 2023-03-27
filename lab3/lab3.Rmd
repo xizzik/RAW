@@ -91,51 +91,134 @@ cars_sample <- dplyr::sample_n(cars, 1000)
 cars_sample <- cars_sample %>% mutate(random_col = rnorm(1000, mean = 3, sd = 0.5))
 head(cars_sample)
 ```
-```{r}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 cars_sample <- cars_sample %>% dplyr::filter((fuelType!='Hybrid')&(fuelType!='Other')&(fuelType!='Electric'))
 ```
 
-```{r}
-cars_model <- lm(price ~ age, data = cars_sample)
-summary(cars_model)
+Zacznijmy od modelu, który przewiduje cenę za pomocą wieku auta.
+```{r, echo=FALSE}
+MAE <- function(y_actual, y_predicted){
+  return(mean(abs(y_actual - y_predicted)))
+}
+MAPE <- function(y_actual, y_predicted){
+  return(mean(abs((y_actual-y_predicted)/y_actual))*100)
+}
+RMSE <- function(y_actual, y_predicted){
+  return(sqrt(mean((y_actual-y_predicted)^2)))
+}
 ```
-```{r}
-ggplot(cars_sample, aes(x = age)) + geom_histogram(bins = 10)
+
+```{r, echo=FALSE}
+library(broom)
+
+model_summary <- function(model, test_data, test_y){
+  model_glance <- broom::glance(model)
+  model_augment <- broom::augment(model)
+  train_mae <- mean(abs(model_augment$.resid))
+  train_mape <- mean(abs(model_augment$.resid/dplyr::pull(model_augment, var=1)))*100
+  predicted_y <- predict(model, test_data)
+  test_rmse <- sqrt(mean((test_y - predicted_y)^2))
+  test_mae <- mean(abs(test_y - predicted_y))
+  test_mape <- mean(abs((test_y - predicted_y)/test_y))*100
+  print("Wartośći charakterystyk liczbowych modelu.")
+  print("------------------------------------------")
+  cat("Treningowe R^2 wyniosło: ", model_glance$r.squared, "\n",
+  "Treningowe \"poprawione\" R^2 wyniosło: ", model_glance$adj.r.squared, "\n",
+  "Kryterium informacyjne Akaikego (AIC) wyniosło: ", model_glance$AIC, "\n",
+  "---------------------------------------------", "\n",
+  "Charakterystyki \"out-of-sample\"", "\n",
+  "Charakterystyka |   train  |   test   | \n", 
+  "RMSE wyniosło:  |", model_glance$sigma, "|", test_rmse , "|", "\n",
+  "MAE wyniosło:   |", train_mae, "|",  test_mae, "|" , "\n",
+  "MAPE wyniosło:  |", round(train_mape,2), "%|", round(test_mape,2), "%|",  "\n")
+}
 ```
+
+
 ```{r}
-cars_model <- lm(price ~ log(age), data=cars_sample)
-summary(cars_model)
-```
-```{r}
-cars_model <- lm(price ~ log(age)+mpg, data=cars_sample)
-summary(cars_model)
-```
-```{r}
-summary(lm(price ~ log(age)+random_col, data=cars_sample))
-```
-```{r}
-cars_model <- lm(price ~ log(age)+mpg+engineSize, data=cars_sample)
-summary(cars_model)
+library(caret)
+split <- createDataPartition(cars_sample$price, p=0.75, list=FALSE)
+cars_sample_train <- cars_sample[split,]
+cars_sample_test <- cars_sample[-split,]
 ```
 
 ```{r}
-ggplot(cars_sample, aes(x=engineSize)) + geom_histogram(bins = 20)
+cars_model <- lm(price ~ age, data = cars_sample_train)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+Spróbujmy poprawić jakość modelu wykorzystując eksploracyjną analizę danych. Zbadajmy histogram zmiennej objaśniającej w celu określenia charakteru jej rozkładu.
+
+```{r}
+ggplot(cars_sample_train, aes(x = age)) + geom_histogram(bins = 10)
+```
+Zmienna objaśniająca ma bardzo mało obserwacji w prawym ogonie, spróbujmy złagodzić wpływ tego efektu dokonując transformacji logarytmem.
+
+```{r}
+cars_model <- lm(price ~ log(age), data=cars_sample_train)
+summary(cars_model)
 ```
 
+Bez narażania się na przeuczenie naszego modelu ciężko jest znaleźć dodatkowe transformacje, które ulepszą nasz model. Zbadajmy jeszcze jego charakterystyki liczbowe.
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+
+#Model drugi
+
+W takim razie najprostszym kolejnym krokiem jaki możemy podjąć jest dodanie kolejnych zmiennych do modelu!
+
+```{r}
+cars_model <- lm(price ~ log(age)+mpg, data=cars_sample_train)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+Dodanie zmiennej na pewno znacznie i korzystnie wpłynęło na jakość modelu pod wieloma względami. Należy niestety jednak uważać i badać z jakich w zasadzie charakterystyk liczbowych modelu korzystamy w celu określenia jego jakości. Dodajmy teraz do modelu kolumne szumu losowego, w żaden sposób nie skorelowanego ze zmienną objaśnianą.
+
+# Model z losową kolumną
+
+```{r}
+bad_cars_model <- lm(price ~ log(age) + random_col, data=cars_sample_train)
+summary(bad_cars_model)
+```
+```{r}
+model_summary(bad_cars_model, cars_sample_test, cars_sample_test$price)
+```
+Wniosek: Dodawanie kolejnych zmiennych NIGDY nie pogorszy jakości modelu! Nie zatrzymujmy się na dwóch zmiennych, dodajmy trzecią zmienną do modelu *cars_model*.
+
+# Model trzeci
+
+```{r}
+cars_model <- lm(price ~ log(age)+mpg+engineSize, data=cars_sample_train)
+summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
+```
+# Model czwarty
+
+Dodajmy kolejną zmienną i zaobserwujmy jej wpływ na jakość modelu.
 ```{r}
 cars_model <- lm(price ~ log(age)+mpg+engineSize+mileage, data=cars_sample)
 summary(cars_model)
 ```
-
 ```{r}
-round(cor(cars_sample[,c(2,5,7,8,9)]),2)
+model_summary(cars_model, cars_sample_test, cars_sample_test$price)
 ```
+# Macierz korelacji
+
+Głównym narzędziem, które pomaga nam badać, które zmienne przydadzą się w znaczny sposób w modelu jest macierz korelacji. Pomaga ona również wykryć kolinearność zmiennych objaśniających, która oczywiście jest niekorzystna. Macierz korelacji najczęściej przedstawiamy w formie graficznej.
+```{r}
+cars_sample_cormat <- round(cor(cars_sample[,c(2,3,5,7,8,9)]),2)
+cars_sample_cormat
+```
+
 
 ```{r}
 library(ggcorrplot)
-ggcorrplot(cor(cars_sample[,c(2,5,7,8,9)]), type='lower')
-```
-
-```{r}
-plot(cars_model, which=1:5)
+ggcorrplot(cars_sample_cormat, type='lower')
 ```

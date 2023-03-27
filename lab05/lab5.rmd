@@ -1,0 +1,114 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 4"
+subtitle: 'Jednoczynnikowa analiza wariancji - podstawy' 
+author: 
+  name: 'Adrian Kowalski'
+  affiliation: 'Politechnika Krakowska'
+output: html_notebook
+---
+
+# Podstawy
+
+Zajmiemy się teraz techniką analizy wariancji (ANOVA). Służy ona do wnioskowania statystycznego na temat różnic w srednich wartościach zmiennej objaśnianej między grupami. Na początek przypomnijmy sobie, że znamy już narzędzie służące do porównywania średnich w momencie, gdy mamy tylko dwie grupy.
+
+# Test T studenta
+
+Przypomnimy teraz konstrukcję testu t studenta dla średniej dwóch niezależnych prób. Niech $\overline{x}_1, \overline{x}_2$ oznaczają średnią z prób $x_1, x_2$, $\mu_1, \mu_2$ średnią populacji odpowiednio $x_1,x_2$, $s_1^2, s_2^2$ wariancję z prób $x_1, x_2$ i wreszcie $n_1, n_2$ liczność prób $x_1,x_2$. Rozważać będziemy tutaj obustronną wersję testu t, zatem mamy 
+\[ H_0: \mu_1 = \mu_2, \\ H_1: \mu_1 \neq \mu_2. \]
+Mieliśmy w tym wypadku dwa scenariusze, albo wariancja obu populacji była równa, albo te wariancje były rózne. W pierwszym wypadku statystyka testowa przyjmowała postać
+\[ t = \frac{(\overline{x_1} - \overline{x_2}) - (\mu_1 - \mu_2))}{s_p \sqrt{\frac{1}{n_1} + \frac{1}{n_2}}}, \]
+gdzie $s_p = \sqrt{\frac{(n_1 - 1)s^2_1 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}}$ to pierwiastek z tzw. łączonej wariancji prób $x_1, x_2$ (łączona wariancja pomaga, gdy próby mają różną wielkość). Ta statystyka ma rozkład $t$-studenta z $n_1 + n_2 - 2$ stopniami swobody. W wypadku różnych wariancji statystyka testowa ma postać
+\[ t = \frac{\overline{x_1} - \overline{x_2} - (\mu_1 - \mu_2)}{\sqrt{\frac{s^2_1}{n_1}+\frac{s_2^2}{n_2}}}. \]
+Ta statystyka ma rozkład $t$-studenta o $v$ pseudo-stopniach swobody, gdzie $v$ (tak zwana poprawka Welscha) dane jest wzorem
+\[ \frac{\left(\frac{s^2_1}{n_1} + \frac{s^2_2}{n_2} \right)^2}{\frac{\left( \frac{s_1^2}{n_1}\right)^2}{n_1-1} + \frac{\left( \frac{s_2^2}{n_2}\right)^2}{n_2-1}}. \]
+Oczywiście $v$ nie zawsze jest liczbą całkowitą, więc najczęściej przybliżamy wartość $v$ liczbami całkowitymi, lub korzystamy z oprogramowania statystycznego, do wyznaczenia wartości krytycznej z rozkładu z takim parametrem.
+
+W R test $t$-studenta wykonujemy oczywiście poleceniem t.test(). Równością wariancji w populacjach sterujemy parametrem "var.equal". Wykonajmy przykładowy test $t$-studenta.
+
+Na tych zajęciach zajmiemy się klasycznym zbiorem danych [Student Performance Data Set](https://archive.ics.uci.edu/ml/datasets/student+performance). Jest w nim bardzo dużo cech, ale skupimy się jedynie na kilku z nich.
+
+```{r}
+library(tidyverse)
+student <- readr::read_csv('student-mat.csv')
+head(student)
+```
+```{r}
+summary(student$G1)
+```
+```{r}
+dplyr::sample_n(tbl=student,size=30)$G1
+```
+Jako, że mamy jedynie dwie szkoły przeprowadźmy analizę, czy różniły się wyniki między tymi szkołami (rozważmy wyniki końcowe, kolumna G3).
+```{r}
+ggplot(student, aes(x=school, y=G1)) + geom_point(aes(color=school), position='jitter') + labs(title = 'Wykres punktowy wyników końcowych z podziałem na szkoły', x='Szkoła', y='Wynik końcowy') + theme(legend.position = 'none')
+```
+```{r}
+ggplot(student, aes(x=school, y=G1)) + geom_boxplot() + labs(title = "Wykres pudełkowy wyników końcowych w zależności od szkoły", x='Szkoła', y='Wynik końcowy')
+```
+
+```{r}
+t.test(G1 ~ school, data=student, var.equal=FALSE, alternative='two.sided')
+```
+
+# Jednoczynnikowa Analiza Wariancji
+
+W powyższych rozważaniach zakładaliśmy, że były tylko dwie kategorie, dlatego mogliśmy stosować test $t$-studenta. Na szczęście jeżeli mamy więcej grup, to mamy narzędzie do weryfikacji różnicy w średnich między tymi grupami. Tym narzędziem jest analiza wariancji. W klasycznej analizie wariancji zakładamy, że wariancja każdej z grup jest równa pewnej, tej samej, stałej. Do analizy wariancji używamy statystyki testowej $F$, która ma rozkład zwany rozkładem Snedecora-Fischera. Przy analizie wariancji zakładamy, że mamy próby pochodzące z $k$ grup $x_1, x_2, \dots, x_k$ o średnich $\mu_1, \mu_2, \dots, \mu_n$. Hipotezy naszego testu wyglądają następująco
+\[ H_0: \mu_1 = \mu_2 = \dots = \mu_k, \\
+H_1: \text{przynajmniej jedna ze średnich} \; \mu_i \; \text{jest różna od pozostałych.}\]
+
+Aby wyprowadzić statystykę testową użyjemy zwyczajowej notacji. $y_{ij}$ będzie oznaczało $j$-tą obserwację z $i$-tej grupy, $\overline{y}$ średnią bez podziału na grupy, a $\overline{y}_i$ średnią $i$-tej grupy. Wtedy zakładamy, że $y_{ij} = \overline{y} + (\overline{y}_i - \overline{y}) + (y_{ij} - \overline{y}_i)$, czyli że możemy rozłożyć obserwację na $3$ składniki: średnią wszystkich obserwacji, odchylenie średniej w grupie od całkowitej średniej i odchylenie obserwacji od średniej w grupie. Chcemy też rozbić całkowitą sumę kwadratów \[ SST = \sum_{i,j} (y_{ij} - \overline{y})^2 = \sum_{i,j} y_{ij}^2 - \left( \sum_{i,j} y_{ij} \right)^2,\]
+gdzie sumujemy po wszystkich $i$ - grupach i wszystkich $j$ - obserwacjach w grupach. Na sumę kwadrtów pomiędzy grupami $SSA$ i sumę kwadratów wewnątrz grup $SSW$. Sumę kwadratów pomiędzy grupami wyznaczamy jako 
+\[ SSA = \sum_{i=1}^k n_i(\overline{y}_i - \overline{y})^2, \]
+gdzie $n_i$ to liczność $i$-tej grupy. Natomiast sumę kwadratów wewnątrz grup wyznaczamy jako
+\[ SSW = \sum_{i,j} (y_{ij} - \overline{y}_i)^2. \]
+To pozwala nam zdefiniować średnią sumę kwadratów pomiędzy grupami $MSA = \frac{SSA}{k-1}$ i średnią sumę kwadratów wewnątrz grup $MSW= \frac{SSW}{n - k}$.Wtedy nasza statystyka testowa $F$ (przy założeniu $H_0$) ma postać
+\[ F = \frac{MSA}{MSW} = \frac{\frac{\sum_{i=1}^k n_i(\overline{y}_i - \overline{y})^2}{k-1}}{\frac{\sum_{i,j} (y_{ij} - \overline{y}_i)^2}{n-k}}. \]
+
+Powyższa statystyka ma rozkład $F$ z parametrami $df_1 = k -1$, $df_2 = n - k$. W szczególności dla dwóch grup wygląda to następująco
+
+\[ F = \frac{n_1(\overline{y}_1 - \overline{y})^2 + n_2(\overline{y}_2 - \overline{y})^2}{\frac{\sum_{j=1}^{n_1}(y_{1j} - \overline{y}_1)^2 + \sum_{j=1}^{n_2} (y_{2j} - \overline{y}_2)^2}{n-2}} \]
+
+Można pokazać, że w powyższym wypadku $F = t^2$, więc dla dwóch prób o równej wariancji, analiza wariancji jest równoważna z testem $t$-studenta.
+
+Analizę wariancji w R przeprowadzamy za pomocą polecenia aov(). Wprowadzamy do niej formuły podobnie jak przy poleceniu lm() "zmienna objasniana ~ podział na grupy". Aby zobaczyć wynik analizy wariancji używamy standardowo funkcji summary().
+
+```{r}
+summary(aov(G1 ~ school, data=student))
+```
+```{r}
+student <- student %>% dplyr::mutate(Walc = as.character(Walc))
+```
+
+```{r}
+ggplot(student, aes(x=Walc, y=G1)) + geom_point(aes(color=Walc), position='jitter') + labs(title = 'Wykres punktowy wyników końcowych z podziałem na grupy', x='Częstotliwość spożywania alkoholu w weekend', y='Wynik końcowy') + theme(legend.position = 'none')
+```
+```{r}
+ggplot(student, aes(x=Walc, y=G1)) + geom_boxplot() + labs(title = "Wykres pudełkowy wyników końcowych z podziałem na grupy", x='Częstotliwość spożywania alkoholu w weekend', y='Wynik końcowy')
+```
+
+```{r}
+summary(aov(G1 ~ Walc, data=student))
+```
+
+
+# Analiza Tuckeya-Kramera
+
+Analiza wariancji jest bardzo użytecznym narzędziem, ale ma jeden zasadniczy kłopot w interpretacji. Wynik analizy wariancji mówi nam jedynie o tym, że któraś z grup rózni się od pozostałych, a nie która z nich to jest. Na szczęście mamy narzędzie, które pomoże nam po odrzuceniu hipotezy zerowej analizy wariancji. Tym narzędziem jest procedura Tukeya-Kramera. W R procedurę Tukeya-Kramera wywołujemy poleceniem TukeyHSD(), podając jako argument nasz model analizy wariancji.
+```{r}
+student <- student %>% dplyr::mutate(freetime = as.character(freetime))
+```
+```{r}
+summary(aov(G1 ~ freetime, data = student))
+```
+
+```{r}
+TukeyHSD(aov(G1 ~ freetime, data = student))
+```
+
+```{r}
+plot(TukeyHSD(aov(G1 ~ freetime, data = student)))
+```
+
+# Ćwiczenie
+
+Dalej korzystając z tego samego zbioru danych przeprowadź analizę wariancji dla innych zmiennych objaśniających, w wypadku odrzucenia hipotezy zerowej przeprowadź analizę Tukeya-Kramera.
