@@ -1,0 +1,150 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 8"
+subtitle: 'Regresja logistyczna - podstawy' 
+author: 
+  name: 'Adrian Kowalski'
+  affiliation: 'Politechnika Krakowska'
+output: html_notebook
+---
+
+# zadanie klasyfikacji
+
+Do tej pory zajmowaliśmy się zadaniem regresji, czyli chcieliśmy dopasować model do zmiennej ilościowej, zakładając, że przyjmuje ona wartości rzeczywiste. Zadanie klasyfikacyjne polega na dopasowaniu danej obserwajcji do jednej z kilku klas, czyli zmienna objaśniana jest jakościowa. W bardziej zaawansowanych algorytmach klasyfikacyjnych nie tylko dopasowywujemy do klas, ale zwracamy prawdopodobieństwo przynależności do danej klasy.
+
+Do zadania klasyfikacji, gdy ilość klas jest większa niż 2 nie możemy użyć modelu regresji liniowej. Zilustrujemy to poniższym przykładem. Wczytamy słynny zbiór danych iris.
+
+```{r}
+library(tidyverse)
+iris <- as.tibble(iris)
+head(iris)
+```
+
+```{r}
+unique(iris$Species)
+```
+Jak widać, w zbiorze mamy 3 różne klasy, do których należą nasze dane. Zakodujmy je za pomocą liczb $1,2,3$ na dwa różne sposoby.
+```{r}
+iris1 <- iris %>% dplyr::mutate(Species = ifelse(Species == 'setosa', 1, ifelse(Species == 'versicolor', 2, 3)))
+head(iris1)
+```
+
+```{r}
+iris2 <- iris %>% dplyr::mutate(Species = ifelse(Species == 'setosa', 2, ifelse(Species == 'versicolor', 3, 1)))
+head(iris2)
+```
+
+Dopasujemy teraz model regresji liniowej, objaśniający tak zakodowaną zmienną.
+
+```{r}
+summary(lm(Species ~. , data = iris1))
+```
+
+```{r}
+summary(lm(Species ~., data=iris2))
+```
+To co można zauważyć, to wpływ tego jak zakodowaliśmy zmienne na wynik modelu. Taki efekt jest niedopuszczalny przy klasyfikacji, zatem regresja liniowa nie nadaje się do zadania klasyfikacji w wypadku, gdy mamy więcej niż 2 klasy. Co, gdy mamy dokładnie 2 klasy, czyli zadanie klasyfikacji jest tzw. zagadnieniem klasyfikacji binarnej. Wytnijmy ze zbioru Iris jedną ze zmiennych i dopasujmy model liniowy objaśniający Species.
+```{r}
+iris3 <- iris %>% dplyr::filter(Species != 'versicolor') %>% 
+          dplyr::mutate(Species = ifelse(Species == 'setosa', 0, 1))
+head(iris3)
+```
+
+```{r}
+class_linreg <- lm(Species ~., data=iris3)
+summary(class_linreg)
+```
+Współczynnik $R^2$ sugeruje dobre dopasowanie modelu. W tym wypadku zagadnienia klasyfikacji dokonywalibyśmy następującą regułą - jeżeli wartość przewidywana przez otrzymany model jest większa od $\frac{1}{2}$ to przyporządkowywujemy badanej obserwacji klasę $1$, w przeciwnym wypadku klasę $0$. Problem takiego podejścia jest oczywisty, nie możemy interpretować przewidywanych wartości jako "prawdopodobieństwa" należenia do określonej klasy, ze względu na to, że nic nie stoi na przeszkodzie, aby nasz model zwrócił wartości ujemne, lub większe od $1$. Faktycznie, takie podejście do zadania klasyfikacji jest ściśle powiązane z modelem liniowej analizy dyskryminacyjnej Fishera (LDA), którego raczej nie poruszymy na zajęciach. Zainteresowanych odsyłam do "Statystyczne systemy uczące się" (J. Koronacki, J. Ćwik), rozdział Kolejnym problemem jest weryfikacja klasycznych założeń regresji liniowej. Spójrzmy na wykresy diagnostyczne.
+ 
+```{r}
+plot(class_linreg, which=c(1:3,5))
+```
+W celach wizualizacji stwóżmy jeszcze model klasyfikacji oparty na regresji liniowej o dwóch zmiennych objaśniających. Wtedy możemy narzysować hiperpłaszczyzne decyzyjną, ponieważ jest ona prostą.
+
+```{r}
+db_linmodel <- lm(Species ~ Sepal.Length + Sepal.Width, data = iris3)
+summary(db_linmodel)
+```
+W celu wyznaczenia hiperpłaszczyzny decyzyjnej musimy wyznaczyć jej współczynniki. Robimy to rozwiązując równianie \[ \frac{1}{2} = \beta_0 + \beta_1x_1 + \beta_2x_2.\]
+
+```{r}
+bound_coeffs <- db_linmodel$coefficients
+bc_bias <- -(bound_coeffs[1] - 1/2)/bound_coeffs[3]
+bc_slope <- -bound_coeffs[2]/bound_coeffs[3]
+c(bc_bias, bc_slope)
+```
+
+```{r}
+ggplot(iris3, aes(x = Sepal.Length, y = Petal.Length, color = as.factor(Species))) + geom_point() + geom_abline(slope = bc_slope, intercept = bc_bias, color = 'blue', linetype = 'dashed') + labs(color = 'Species')
+```
+
+# Regresja logistyczna
+
+Jednym z remediów na problemy regresji liniowej opisane powyżej (i pewne nieopisane powyżej - chociażby tzw. maskowanie klas) jest regresja logistyczna. Regresja logistyczna jest przykładem Uogólnionego Modelu Liniowego (GLM). Sformułujemy teraz model regresji logistycznej dla zadania klasyfikacji binarnej. Oznaczmy nasze klasy przez liczby $0,1$. Naszym punktem wyjścia jest założenie, że prawdopodobieństwo przynależności do klas można opisać wzorami
+\[ \mathbb{P}(Y = 0 | \mathbf{X}) = \frac{1}{1 + \mbox{exp}(\beta_0 + \beta^T\mathbf{x})}, \]
+gdzie $\beta = \left[\begin{array}{l} \beta_1 \\ \beta_2 \\ \dots \\ \beta_k \end{array} \right]$, natomiast
+\[ \mathbb{P}(Y = 1| \mathbf{x}) = \frac{\mbox{exp}(\beta_0 + \beta^T \mathbf{x})}{1 + \mbox{exp}(\beta_0 + \beta^T \mathbf{x})} = \left( \frac{1}{1 + e^{-(\beta_0 + \beta^T\mathbf{x})}} \right). \]
+Oznaczmy $\mathbb{P}(Y = 1 | \mathbf{X}) =: \hat{p}$. Zauważmy, że $\mathbb{P}(Y = 0 | \mathbf{X}) = 1 - \hat{p}$. Ponadto, zauważmy że $p \in [0,1]$. Zastosujmy teraz szereg przekształceń. Po pierwsze
+\[ \frac{p}{1-p} = e^{\beta_0 + \beta^T \mathbf{x}}. \]
+Zauważmy, że $\frac{p}{1-p} > 0$, zatem możemy zlogarytmować powyższe wyrażenie i otrzymać tzw. funkcję logitową (log-odds)
+\[ \mbox{ln}\frac{p}{1-p} = \beta_0 + \beta^T \mathbf{x}. \]
+
+Estymację współczynników modelu dokonujemy za pomocą metody największej wiarygodności, dla naszej postaci modelu przyjmuje ona postać
+\[ L(Y | \beta_0, \beta, \mathbf{X}) = \prod_{i=1}^n \hat{p}^{y_i}(1-\hat{p})^{1-y_i}. \]
+Logwiarygodność zatem ma postać
+\[ \ell(Y | \beta_0, \beta, \mathbf{X}) = \sum_{i=1}^n y_iln\hat{p} + (1-y_i)ln(1- \hat{p}).\]
+Często w literaturze można się spotkać z funkcją postaci $-\ell = -\sum_{i=1}^n y_iln\hat{p} + (1-y_i)ln(1- \hat{p})$, którą wtedy minimalizujemy i nazywamy entropią krzyżową lub stratą logarytmiczną (cross-entropy, log-loss). Niestety, optymalizacja tej funkcji nie jest możliwa w sposób analityczny, musismy kożystać z metod numerycznych takich jak chociażby gradient descent, czy metody quasi-Newtonowskie jak L-BFGS. 
+W R regresję logistyczną wywołujemy poleceniem  *glm* z parametrem *family*='binomial'.
+
+```{r}
+logistic1 <- glm(Species ~ Sepal.Length + Sepal.Width, data = iris3, family = 'binomial')
+summary(logistic1)
+```
+Zwróćmy uwagę na powyższe ostrzeżenia od oprogramowania R. Danę ze zbioru iris3 są perfekcyjnie oddzielalne liniowo, co wykazaliśmy wcześniej. Zatem prawdopodobieństwo $\hat{p}$ często jest numerycznie nieodróżnialne od $1$, a wtedy pojawia nam się problem z dopasowaniem modelu, wszak nie możemy wykonać działania $\frac{\hat{p}}{1 - \hat{p}}$. Do danych oddzielalnych liniowo służą inne algorytmy, jak wspomniana wcześniej LDA, czy klasyczny Perceptron. Zaimportujmy zatem nowy zbiór danych, [Heart Failure Prediction](https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction).
+
+```{r}
+heart <- readr::read_csv('heart.csv')
+head(heart)
+```
+
+
+```{r}
+table(heart$HeartDisease)
+```
+Zbudujmy prosty model regresji logistycznej z dwoma predyktorami.
+
+```{r}
+logistic2 <- glm(HeartDisease ~ Cholesterol + RestingBP, data = heart, family = 'binomial')
+summary(logistic2)
+```
+Hiperpłaszczyzna decyzyjna w wypadku regresji logistycznej jest rozwiązaniem równania \[ \frac{1}{2} = \hat{p}. \]
+
+```{r}
+dec_bond <- logistic2$coefficients
+logistic2_slope = -dec_bond[2]/dec_bond[3]
+logistic2_intercept = -dec_bond[1]/dec_bond[3]
+```
+
+```{r}
+ggplot(heart, aes(x = Cholesterol, y = RestingBP, color = as.factor(HeartDisease))) + geom_point() + geom_abline(slope = logistic2_slope, intercept = logistic2_intercept, color = 'blue', linetype = 'dashed') + 
+    labs(color = 'Heart Disease')
+```
+# Walidacja jakości modelu 
+
+Modele porównywać możemy między sobą na podstawie kryterium Akaikego (AIC), natomiast ocena konkretnego modelu przebiega za pomocą macierzy pomyłek. Stworzymy ją za pomocą biblioteki *caret*.
+```{r}
+logit_prediction <- predict(logistic2, heart[c(4,5)], type = 'response')
+head(logit_prediction)
+```
+```{r}
+logistic2_predictions <- ifelse(logit_prediction > 0.5, 1, 0)
+head(logistic2_predictions)
+```
+
+
+```{r}
+library(caret)
+caret::confusionMatrix(data = as.factor(logistic2_predictions), reference = as.factor(heart$HeartDisease))
+```
+# Ćwiczenie
+
+Używając kryterium Akaikego i macierzy pomyłek dopasuj model regresji logistycznej do danych heart.

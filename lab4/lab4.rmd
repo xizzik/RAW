@@ -1,0 +1,125 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 4"
+author:
+  name: Adrian Kowalski
+  affiliation: Politechnika Krakowska
+subtitle: Regresja liniowa wieloraka - zmienne jakościowe i miary jakości modelu
+output:
+  html_document:
+    df_print: paged
+---
+
+# Zmienne jakościowe
+
+Do tej pory budowaliśmy modele regeresji liniowej, w których zmienne objaśniające były zmiennymi ilościowymi - to znaczy były liczbami. Nie jest to jedyna opcja jaką możemy eksplorować. Nauczymy się teraz jak kożystać ze zmiennych jakościowych (kategorialnych) przy budowaniu modelu regresji.
+
+Na początek rozważmy sytuację, gdy nasza zmienna objaśniająca przyjmuję jedną z dwóch wartości. Oznaczmy ją przez $x_1$, a jej wartości oznaczmy $0$ oraz $1$. Wtedy nasz model regresji wyłącznie ze względu na tą zmienną przyjmuje postać
+\[ y_i = \beta_0 + \beta_1 x_{i1} + \varepsilon_i.\]
+Czyli zupełnie taką jak w przypadku modelu regresji liniowej prostej. Faktycznie jedyna zmiana jaka zaszła, to taka, że zmienna $x_1$ ma dokładnie dwie wartości. W sytuacji, gdy nasza zmienna przyjmuje więcej niż dwie wartości musimy zastosować tak zwany one-hot coding. Zakładając, że analizowana przez nas zmienna $x$ objaśniająca przyjmuje 4 wartości $1,2,3,4$ musimy postąpić następująco. Wprowadzamy 4 nowe zmienne $x_1, x_2, x_3, x_4$. Zmienna $x_1$ przyjmuje wartość $1$, gdy $x$ przyjmuje wartość $1$, zero w przeciwnym wypadku. Analogicznie będą działać pozostałe zmienne $x_2, x_3, x_4$. Wówczas nasze równanie regresji wyglądać będzie następująco
+\[ y_i = \beta_0 + \beta_1x_1 + \beta_2x_2 + \beta_3x_3 + \beta_4x_4 + \varepsilon_i.\]
+Niestety należy zauważyć pewien problem z tym podejściem, na szczęście łatwo sobie z nim poradzimy. Zbudujmy przykładową macierz planu dla modelu opisującego zmienną $y$ za pomocą $x$. 
+\[ X = \left[ \begin{array}{ccccc}1 \; 0 \; 1 \; 0 \; 0 \\ 1 \; 0 \; 0 \; 0 \; 1 \\ 1 \; 0 \; 0 \; 0 \; 1 \\ 1 \; 0 \; 1 \; 0 \; 0 \\ 1 \; 1 \; 0 \; 0 \; 0 \end{array}\right]\]
+Oznaczając kolumny tej macierzy przez $c_0, c_1, c_2, c_3, c_4$ musimy niestety zauważyć, że zachodzi multikolinearność postaci $c_0 = c_1 + c_2 + c_3 + c_4$. Z poprzednich zajęć pamiętamy, że taka sytuacja uniemożliwia nam zbudowanie dobrego modelu. Ale nic nie stoi na przeszkodzie, żeby wyrzucić jedną z kolumn tej macierzy. Jest to równoznaczne z zakodowaniem wartości zmiennej $x$ za pomocą zmiennych $x_1, x_2, x_3$ i w momencie, gdy $x$ przyjmuje $4$ to wszystkie z $x_1, x_2, x_3$ przyjmują $0$.
+
+Dla przykładu, wróćmy do zbioru danych z poprzednich zajęć. 
+
+```{r, message=FALSE}
+library(tidyverse)
+cars <- readr::read_csv('cars_dataset.csv')
+cars <- cars %>% dplyr::mutate(year = 2022 - year) %>% dplyr::rename(age = year)
+cars <- cars %>% dplyr::filter((fuelType!='Hybrid')&(fuelType!='Other')&(fuelType!='Electric'))
+cars_sample <- dplyr::sample_n(cars, 1000)
+head(cars_sample)
+```
+```{r}
+unique(cars_sample$transmission)
+```
+
+```{r}
+unique(cars_sample$fuelType)
+```
+Zbudujmy model regresji badający zależność ceny od wieku i rodzaju skrzyni biegów w aucie. Funkcja lm() w R jest na tyle dobrze zaprojektowana, że jeżeli mamy w naszej ramce danych dane w postaci "stringów", to R niejako automatycznie dokona one-hot codingu.
+
+```{r}
+cars_model <- lm(log(price) ~ log(age)+transmission, data=cars_sample)
+summary(cars_model)
+```
+Spróbujmy wykonać one-hot coding samodzielnie i zobaczmy czy otrzymamy ten sam wynik.
+```{r}
+cars_sample$transmission <- as_factor(cars_sample$transmission)
+cars_sample <- cars_sample %>% dplyr::mutate(trasManual = ifelse(transmission=='Manual',1,0)) %>% dplyr::mutate(trasSemiAuto = ifelse(transmission=='Semi-Auto',1,0)) %>%     dplyr::mutate(trasAuto = ifelse(transmission=='Automatic',1,0))
+head(cars_sample)
+```
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + trasManual + trasSemiAuto, data=cars_sample)
+summary(cars_model)
+```
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + trasManual + trasAuto, data=cars_sample)
+summary(cars_model)
+```
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + trasManual + trasAuto + trasSemiAuto, data=cars_sample)
+summary(cars_model)
+```
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + trasAuto + trasSemiAuto, data=cars_sample)
+summary(cars_model)
+```
+
+# Interakcje
+
+Do modelu możemy wprowadzić również tzw. czynniki interakcyjne. Wprowadzenie czynników interakcyjnych może sugerować przede wszystkim wiedza ekspercka. Jeżeli mamy zmienną objaśniającą jakościową (załóżmy, że binarną) $d$, to model z czynnikiem interakcji i jedną inną zmienną objaśniającą wygląda następująco
+\[ y_i = \beta_0 + \beta_1x_i + \beta_2d + \beta_3dx_i.\]
+W R czynniki interakcyjne wprowadzamy podając znak ":" między nazwami dwóch zmiennych. Spójżmy na przykładzie, dodajmy do naszego modelu interakcje między rodzajem paliwa, a rozmiarem silnika. Zasada hierarchiczności mówi, że przed dodaniem czynnika interakcji wprowadzamy do modelu zmienne bez interakcji.
+```{r}
+cars_model <- lm(log(price) ~ log(age) + transmission + engineSize + fuelType, data=cars_sample)
+summary(cars_model)
+```
+```{r}
+cars_model <- lm(log(price) ~ log(age) + transmission + engineSize + fuelType + engineSize:fuelType, data=cars_sample)
+summary(cars_model)
+```
+Nasz pomysł okazał się nie trafiony, nie znaczy to jednak, że w przypadku każdych danych wprowadzenie czynnika interakcji będzie złym pomysłem. Jest to narzędzie, o którym czasem warto pamiętać przy budowie modelu regresji liniowej.
+
+
+# VIF
+
+Poprzednio wspominaliśmy o współczynniku VIF, który miał nam pomagać w wykrywaniu multikolinearności w danych. Na dzisiejszych zajęciach znaleźliśmy przykład, w którym na pewno występuje multikolinearność więc jest to świetna okazja na poznanie jak działa VIF (Variance Inflation Factor). VIF jest współczynnikiem, który definiujemy dla poszczególnego współczynnika zmiennej objaśnianej. Powstaje jako iloraz wariancji współczynnika $\beta_i$ w pełnym modelu do jego wariancji w modelu, który ma tylko $x_i$ jako zmienną objaśniającą. Możemy go wyrazić wzorem \[ VIF(\beta_i) = \frac{1}{1 - R^2_{X_j|X_{-j}} }\]
+gdzie przez $R^2_{X_j|X_{-j}}$ oznaczamy współczynnik $R^2$ modelu regresji, gdzie zmienną objaśnianą jest $X_j$, a objaśniającymi są wszystkie pozostałe zmienne niezależne z modelu pierwotnego. Z tej postaci można zauważyć, że VIF jest zawsze większy od $1$, a coraz większe wartości VIF wskazują na coraz większy stopień kolinearności. Praktyka pokazuje, że zaalarmowani powinniśmy być, gdy VIF danej zmiennej przekracza 5, a poważnie martwić, gdy przekracza 10.
+
+Do wyznaczania VIF w R służY funkcja vif() z pakietu $\textit{car}$. Ważne, aby zauważyć, że w wypadku gdy w naszym modelu znajduja się zmienne jakościowe, to ta funkcja zwraca GVIF. GVIF traktuje zmienne jakościowe niejako "łącznie", nie licząc VIF dla każdej z osobna, przez co daje nam rzetelną informację o multikolinearności. GVIF dla zmiennych ciągłych jest taki sam jak VIF.
+
+```{r, message=FALSE, warning=FALSE}
+library(car)
+cars_model <- lm(log(price) ~ log(age) + engineSize + mpg, data=cars_sample)
+car::vif(cars_model)
+```
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + engineSize + mpg + transmission, data=cars_sample)
+car::vif(cars_model)
+```
+
+```{r, error=TRUE}
+cars_model <- lm(log(price) ~ log(age) + trasAuto + trasManual + trasSemiAuto, data = cars_sample)
+car::vif(cars_model)
+```
+
+Powyższy błąd znaczy dokładnie tyle, że mamy perfekcyjnie skorelowane zmienne w modelu.
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + trasAuto + trasManual, data = cars_sample)
+car::vif(cars_model)
+```
+
+```{r}
+cars_model <- lm(log(price) ~ log(age) + trasSemiAuto + trasManual, data = cars_sample)
+car::vif(cars_model)
+```
+
+Zauważmy, że dla zmiennych kategorialnych VIF zależy od wyboru zmiennej podstawowej!

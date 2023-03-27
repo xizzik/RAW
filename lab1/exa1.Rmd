@@ -1,0 +1,177 @@
+---
+title: "Regresja i analiza wariancji - Laboratorium 1"
+subtitle: 'Regresja liniowa prosta - wprowadzenie' 
+author: 
+  name: 'Adrian Kowalski'
+  affiliation: 'Politechnika Krakowska'
+output:
+  html_document:
+    theme: darkly
+    df_print: paged
+    toc: true
+    toc_float: true
+---
+# Podstawy
+Klasyczny model regresji liniowej prostej wygląda następująco
+$$ y_i = \beta_0 + \beta_1 x_i + \varepsilon_i$$
+dla zmiennej objaśnianej (endogeniczej) $y$, zmiennej objaśniającej(egzogenicznej) $x$ i szumu $\varepsilon_i \stackrel{iid}{\sim} N(0,\sigma^2)$.
+Współczynniki $\beta_0$ i $\beta_1$  wybieramy za pomocą metody najmniejszych kwadratów, czyli tak, aby minimalizowały funkcję 
+$$ MSE = \frac{1}{n-2}\sum_{i=1}^{n} (y - \hat{y})^2 = \frac{1}{n-2}\sum_{i=1}^{n} (y - \beta_0 - \beta_1x)^2 = \frac{1}{n-2} \sum_{i=1}^n \varepsilon_i^2  $$
+Istnieje dokładne rozwiązanie tego problemu i jest ono dane za pomocą wzorów
+$$ \begin{array}{ll} \beta_1 = \frac{\sum_{i=1}^n (x_i - \overline{x})(y_i - \overline{y})}{\sum_{i=1}^n (x_i - \overline{x})^2}  \\ \hat{\beta_0} = \overline{y} - \beta_1\overline{x} \end{array} $$
+
+# Regresja liniowa prosta w R
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+W R do dopasowywania modeli regresji liniowej prostej służy funkcja lm(). Zobaczmy jej działanie na prostym przykładzie.
+
+```{r}
+data_line <- tibble(points=1:10) %>% mutate(line=2*points+3)
+
+ggplot(data_line, aes(x=points, y=line)) + geom_line() + geom_point() + ggtitle('Wykres funkcji y=2x+3')
+```
+Powyżej zdefiniowaliśmy zbiór punktów leżących na prostej, spodziewamy się więc, że model regresji liniowej dopasuje do nich dokładnie tą prostą. Dopasowywujemy więc model do danych, składnia polecenia lm() wymaga od nas podania wyrażenia typu "formula" w postaci $y \sim x$. Obiekt, który zwraca funkcja lm() przypisujemy do zmiennej i możemy wywołać na nim funkcje summary(), która zwraca informacje o dopasowaniu.
+
+```{r}
+first_model <- lm(line ~ points, data=data_line)
+first_model_summary <- summary(first_model)
+first_model_summary
+
+```
+
+## Interpretacjia funkcji summary()
+
+Rozbijmy po kolei informacje, które dostajemy po wywołaniu funkcji summary().
+
+### Call
+
+```{r}
+first_model_summary$call
+```
+
+Parametr "call" zawiera formułę, którą użyliśmy do definicji modelu.
+
+### Residuals
+
+```{r}
+first_model_summary$residuals
+```
+
+```{r}
+quantile(first_model_summary$residuals)
+```
+Parametr "residuals" zwraca reszty modelu, czyli $\varepsilon_i$. W zwracanym na ekran przez funkcję summary tekscie widzimy od razu kwartyle reszt.
+
+### Coefficients
+
+```{r}
+first_model_summary$coefficients
+```
+Parametr "coefficients" zawiera informacje o współczynnikach $\beta_0$ i $\beta_1$ modelu. Mamy tu oszacowanie poszczególnych parametrów, błąd standardowy tego oszacowania. Po za tym mamy wartość statystyki testowej $t$ i $p$-wartość, które odnoszą się do testu na to czy dany współczynnik jest niezerowy.
+$$ H_0: \beta_1 = 0 \\
+H_1: \beta_1 \neq 0$$
+W zwracanym przez funkcje summary() tekście mamy jeszcze gwiazdki * oznaczające istotność statystyczną wyniku testu, im więcej gwiazdek, tym istotniejszy wynik.
+
+### Sigma
+
+```{r}
+first_model_summary$sigma
+```
+Parametr "residuals standard error" (sigma) odnosi się do oszacowanego przez model parametru odchylenia standardowego dla reszt $\varepsilon$. Wyliczany jest ze wzoru
+$$ \sigma = \sqrt{MSE}$$
+
+### $R^2$
+
+```{r}
+c(first_model_summary$r.squared, first_model_summary$adj.r.squared)
+```
+Parametry $R^2$ i adjusted $R^2$ to tzw. wskaźniki determinacji. W przypadku regresji liniowej prostej wskaźnik $R^2$ to po prostu kwadrat współczynnika korelacji Pearsona zmiennej $x$ ze zmienną $y$, Warto jednak zaznaczyć, że wskaźnik $R^2$ pojawia się również w innych modelach i użyteczna jest jego ogólna postać
+$$ R^2 = 1 - \frac{\sum_{i=1}^n \varepsilon_i^2}{\sum_{i=1}^n (y_i - \overline{y})^2}$$
+Wskaźnik determinacji $R^2$ interpretujemy jako ułamek wariancji w danych, które wyjaśnia nasz model. Zawiera się w przedziale $[0,1]$. Adjusted $R^2$ jest wskaźnikiem interesującym dopiero w przypadku modeli regresji wielorakiej, podobnie jak $F$-test.
+
+# Model niedeterministyczny
+
+Skomplikujmy teraz nasz model, dodając do danych szum losowy.
+```{r}
+data_line <- data_line %>% mutate(rv=rnorm(10)) %>% mutate(line_rv=line+rv)
+
+ggplot(data_line, aes(x=points, y=line_rv)) + geom_line(aes(x=points, y=line)) + geom_point() + ggtitle('Wykres funkcji y=2x+3 z szumem N(0,1)')
+```
+Dopasujmy do naszych nowo wygenerowanych danych model regresji liniowej prostej.
+```{r}
+second_model <- lm(line_rv ~ points, data=data_line)
+second_model_summary <- summary(second_model)
+second_model_summary
+```
+Zwiększmy ilość danych, do których dopasowujemy model.
+```{r}
+data_line_large <- tibble(points=1:100) %>% mutate(rv=rnorm(100)) %>% mutate(line=2*points+3) %>% mutate(line_rv=line+rv)
+ggplot(data_line_large, aes(x=points, y=line_rv)) + geom_point() + geom_line(aes(x=points, y=line)) + ggtitle("Wykres prostej 2x+3 z szumem N(0,1) dla 100 punktów")
+```
+```{r}
+third_model <- lm(line_rv ~ points, data=data_line_large)
+third_model_summary <- summary(third_model)
+third_model_summary
+```
+# Przykład: Wycena metra kwadratowego mieszkania
+
+Skorzystamy z danych [Real estate valuation](https://archive.ics.uci.edu/ml/datasets/Real+estate+valuation+data+set). Zbiór zawiera 7 zmiennych: datę transakcji, wiek nieruchomości, odległość w metrach do najbliższego środku transportu masowego, ilość sklepów w "okolicy", współrzędne geograficzne nieruchomości oraz cenę za jednostkę powierzchni nieruchomości (oryginalnie 10000 dolarów taiwańskich za jeden Ping). Stworzymy model regresji liniowej prostej do przewidywania ceny na podstawie odległości do najbliższego węzła komunikacyjnego. Zacznijmy od wczytania danych.
+
+```{r}
+library(tidyverse)
+houses <- readr::read_csv('real_estate.csv')
+head(houses)
+```
+```{r, echo=FALSE}
+houses <- houses %>% dplyr::rename(transaction_date = `X1 transaction date`, age = `X2 house age`,
+                                   nearest_mrt_distance = `X3 distance to the nearest MRT station`,
+                                   stores_no = `X4 number of convenience stores`,
+                                   geo_latitude = `X5 latitude`, geo_longtitude = `X6 longitude`,
+                                   price_ua = `Y house price of unit area`) %>%
+          dplyr::select(!No)
+houses$price_ua <- ((houses$price_ua/3.3)*10000)/28.02 #zamiana na dolar za metr kwadratowy
+```
+
+
+```{r}
+houses_model <- lm(price_ua ~ nearest_mrt_distance, data=houses)
+houses_summary <- summary(houses_model)
+houses_summary
+```
+Zobaczmy, czy możemy ulepszyć powyższy model. W tym celu sprawdźmy rozkład ceny, za pomocą histogramu.
+```{r}
+quantile(houses$price_ua)
+```
+
+```{r}
+ggplot(houses, aes(x=price_ua)) + geom_histogram(binwidth = 1000) + ggtitle('Histogram ceny za jedną jednostke powierzchni mieszkania') + xlab("Cena w dolarach") + ylab("Ilość")
+```
+To co można od razu zauważyć z histogramu to istnienie wartości odstającej, której w celu poprawienia jakości modelu się pozbędziemy. Spójrzmy jeszcze na histogram odległości.
+```{r}
+quantile(houses$nearest_mrt_distance)
+```
+
+```{r}
+ggplot(houses, aes(x=nearest_mrt_distance)) + geom_histogram(binwidth=500) + ggtitle("Histogram odległości od najbliższej stacji transportu masowego") + xlab("Odległóść w metrach") + ylab("Ilość")
+```
+Mamy tutaj bardo dużo obserwacji o niskich wartościach i coraz mniej o coraz większych. Innymi słowy histogram ma charakter rozkładu wykładniczego. W celu poprawienia skali zastosujemy dla tej zmiennej trasformacje logarytmem. Poniżej badamy jeszcze kwantyle naszej ceny, aby odrzucić skrajne obserwacje.
+
+
+```{r}
+c(quantile(houses$price_ua, 0.05), quantile(houses$price_ua, 0.95))
+```
+```{r, echo=FALSE}
+houses2 <- houses %>% dplyr::filter(price_ua > quantile(houses$price_ua, 0.05)) %>% dplyr::filter(price_ua < quantile(houses$price_ua, 0.95))
+```
+
+```{r}
+houses_model2 <- lm(price_ua ~ log(nearest_mrt_distance), data=houses2)
+houses_model2_summary <- summary(houses_model2)
+houses_model2_summary
+```
+
+# Cwiczenie
+
+Utwórz modele regresji liniowej prostej korzystając ze zbioru danych houses dla pozostałych predyktorów i porównaj je między sobą.
