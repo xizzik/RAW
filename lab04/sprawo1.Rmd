@@ -4,10 +4,15 @@ subtitle: 'Regresja liniowa - sprawozdanie'
 author: 
   name: 'Adrian Kowalski'
   affiliation: 'Politechnika Krakowska'
-output: html_notebook
+output: 
+  html_document:
+    theme: readable
+    toc: true
+    toc_float: true
+    df_print: paged
 ---
 
-# Termin oddania sprawozdania : 9.12.2022
+# Termin oddania sprawozdania : 14.04.2023 23:59:59
 
 
 # Zadanie 1

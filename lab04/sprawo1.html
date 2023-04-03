@@ -11,7 +11,7 @@
 
 
 
-<title>Regresja i analiza wariancji - Laboratorium 4</title>
+<title>Regresja i analiza wariancji - Sprawozdanie 1</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -2766,345 +2766,57 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">Regresja i analiza wariancji - Laboratorium
-4</h1>
-<h3 class="subtitle">Regresja liniowa wieloraka - zmienne jakościowe i
-miary jakości modelu</h3>
+<h1 class="title toc-ignore">Regresja i analiza wariancji - Sprawozdanie
+1</h1>
+<h3 class="subtitle">Regresja liniowa - sprawozdanie</h3>
 <h4 class="author">Adrian Kowalski</h4>
 <address class="author_afil">
 Politechnika Krakowska<br>
 </div>
 
 
-<div id="zmienne-jakościowe" class="section level1">
-<h1>Zmienne jakościowe</h1>
-<p>Do tej pory budowaliśmy modele regeresji liniowej, w których zmienne
-objaśniające były zmiennymi ilościowymi - to znaczy były liczbami. Nie
-jest to jedyna opcja jaką możemy eksplorować. Nauczymy się teraz jak
-kożystać ze zmiennych jakościowych (kategorialnych) przy budowaniu
-modelu regresji.</p>
-<p>Na początek rozważmy sytuację, gdy nasza zmienna objaśniająca
-przyjmuję jedną z dwóch wartości. Oznaczmy ją przez <span class="math inline">\(x_1\)</span>, a jej wartości oznaczmy <span class="math inline">\(0\)</span> oraz <span class="math inline">\(1\)</span>. Wtedy nasz model regresji wyłącznie ze
-względu na tą zmienną przyjmuje postać <span class="math display">\[ y_i
-= \beta_0 + \beta_1 x_{i1} + \varepsilon_i.\]</span> Czyli zupełnie taką
-jak w przypadku modelu regresji liniowej prostej. Faktycznie jedyna
-zmiana jaka zaszła, to taka, że zmienna <span class="math inline">\(x_1\)</span> ma dokładnie dwie wartości. W
-sytuacji, gdy nasza zmienna przyjmuje więcej niż dwie wartości musimy
-zastosować tak zwany one-hot coding. Zakładając, że analizowana przez
-nas zmienna <span class="math inline">\(x\)</span> objaśniająca
-przyjmuje 4 wartości <span class="math inline">\(1,2,3,4\)</span> musimy
-postąpić następująco. Wprowadzamy 4 nowe zmienne <span class="math inline">\(x_1, x_2, x_3, x_4\)</span>. Zmienna <span class="math inline">\(x_1\)</span> przyjmuje wartość <span class="math inline">\(1\)</span>, gdy <span class="math inline">\(x\)</span> przyjmuje wartość <span class="math inline">\(1\)</span>, zero w przeciwnym wypadku.
-Analogicznie będą działać pozostałe zmienne <span class="math inline">\(x_2, x_3, x_4\)</span>. Wówczas nasze równanie
-regresji wyglądać będzie następująco <span class="math display">\[ y_i =
-\beta_0 + \beta_1x_1 + \beta_2x_2 + \beta_3x_3 + \beta_4x_4 +
-\varepsilon_i.\]</span> Niestety należy zauważyć pewien problem z tym
-podejściem, na szczęście łatwo sobie z nim poradzimy. Zbudujmy
-przykładową macierz planu dla modelu opisującego zmienną <span class="math inline">\(y\)</span> za pomocą <span class="math inline">\(x\)</span>. <span class="math display">\[ X =
-\left[ \begin{array}{ccccc}1 \; 0 \; 1 \; 0 \; 0 \\ 1 \; 0 \; 0 \; 0 \;
-1 \\ 1 \; 0 \; 0 \; 0 \; 1 \\ 1 \; 0 \; 1 \; 0 \; 0 \\ 1 \; 1 \; 0 \; 0
-\; 0 \end{array}\right]\]</span> Oznaczając kolumny tej macierzy przez
-<span class="math inline">\(c_0, c_1, c_2, c_3, c_4\)</span> musimy
-niestety zauważyć, że zachodzi multikolinearność postaci <span class="math inline">\(c_0 = c_1 + c_2 + c_3 + c_4\)</span>. Z
-poprzednich zajęć pamiętamy, że taka sytuacja uniemożliwia nam
-zbudowanie modelu. Ale nic nie stoi na przeszkodzie, żeby wyrzucić jedną
-z kolumn tej macierzy. Jest to równoznaczne z zakodowaniem wartości
-zmiennej <span class="math inline">\(x\)</span> za pomocą zmiennych
-<span class="math inline">\(x_1, x_2, x_3\)</span> i w momencie, gdy
-<span class="math inline">\(x\)</span> przyjmuje <span class="math inline">\(4\)</span> to wszystkie z <span class="math inline">\(x_1, x_2, x_3\)</span> przyjmują <span class="math inline">\(0\)</span>.</p>
-<p>Dla przykładu, wróćmy do zbioru danych z poprzednich zajęć.</p>
-<p>Zerknijmy na możliwe wartości w kolumnie “transmission” oraz
-“fuelType”.</p>
-<pre class="r"><code>unique(cars_train$transmission)</code></pre>
-<pre><code>## [1] &quot;Manual&quot;    &quot;Semi-Auto&quot; &quot;Automatic&quot;</code></pre>
-<pre class="r"><code>unique(cars_sample$fuelType)</code></pre>
-<pre><code>## [1] &quot;Petrol&quot; &quot;Diesel&quot;</code></pre>
-<p>Zbudujmy model regresji badający zależność ceny od wieku i rodzaju
-skrzyni biegów w aucie. Funkcja lm() w R jest na tyle dobrze
-zaprojektowana, że jeżeli mamy w naszej ramce danych dane w postaci
-“stringów”, to R niejako automatycznie dokona one-hot codingu.</p>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age)+transmission, data=cars_train)
-summary(cars_model)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + transmission, data = cars_train)
-## 
-## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -13246  -3777   -686   2803  35514 
-## 
-## Coefficients:
-##                       Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)            37170.0     1007.2  36.905   &lt;2e-16 ***
-## log(age)              -10939.2      586.6 -18.649   &lt;2e-16 ***
-## transmissionManual     -7376.7      590.8 -12.487   &lt;2e-16 ***
-## transmissionSemi-Auto   1231.9      701.7   1.756   0.0796 .  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 5947 on 747 degrees of freedom
-## Multiple R-squared:  0.5271, Adjusted R-squared:  0.5252 
-## F-statistic: 277.6 on 3 and 747 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>model_summary(cars_model, cars_test, cars_test$price)</code></pre>
-<pre><code>## [1] &quot;Wartośći charakterystyk liczbowych modelu.&quot;
-## [1] &quot;------------------------------------------&quot;
-## Treningowe R^2 wyniosło:  0.5271222 
-##  Treningowe &quot;poprawione&quot; R^2 wyniosło:  0.5252231 
-##  Kryterium informacyjne Akaikego (AIC) wyniosło:  15190.53 
-##  --------------------------------------------- 
-##  Charakterystyki &quot;out-of-sample&quot; 
-##  Charakterystyka |   train  |   test   | 
-##  RMSE wyniosło:  | 5946.803 | 8888.709 | 
-##  MAE wyniosło:   | 4301.762 | 5084.386 | 
-##  MAPE wyniosło:  | 30.41 %| 29.98 %|</code></pre>
-<p>Spróbujmy wykonać one-hot coding samodzielnie i zobaczmy czy
-otrzymamy ten sam wynik.</p>
-<pre class="r"><code>cars_train$transmission &lt;- as_factor(cars_train$transmission)
-cars_test$transmission &lt;- as_factor(cars_test$transmission)
-cars_train_ohc &lt;- cars_train %&gt;% dplyr::mutate(trasManual = ifelse(transmission==&#39;Manual&#39;,1,0)) %&gt;% dplyr::mutate(trasSemiAuto = ifelse(transmission==&#39;Semi-Auto&#39;,1,0)) %&gt;%     dplyr::mutate(trasAuto = ifelse(transmission==&#39;Automatic&#39;,1,0))
-cars_test_ohc &lt;- cars_test %&gt;% dplyr::mutate(trasManual = ifelse(transmission==&#39;Manual&#39;,1,0)) %&gt;% dplyr::mutate(trasSemiAuto = ifelse(transmission==&#39;Semi-Auto&#39;,1,0)) %&gt;%     dplyr::mutate(trasAuto = ifelse(transmission==&#39;Automatic&#39;,1,0))
-head(cars_train_ohc)</code></pre>
+<div id="termin-oddania-sprawozdania-14.04.2023-235959" class="section level1">
+<h1>Termin oddania sprawozdania : 14.04.2023 23:59:59</h1>
+</div>
+<div id="zadanie-1" class="section level1">
+<h1>Zadanie 1</h1>
+<p>Zaimportuj zbiór danych Carseats z biblioteki ISLR i dopasuj model
+(lub modele) regresji liniowej prostej przewidujący wartość zmiennej
+Sales. Zmienną objaśniającą dobierz według znanych metod (współczynnik
+korelacji, wykresy). Oceń jakość modelu (<span class="math inline">\(R^2\)</span>, błąd standardowy) i zweryfikuj
+założenia (analiza reszt).</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.2 ──
+## ✔ ggplot2 3.4.0     ✔ purrr   1.0.1
+## ✔ tibble  3.1.8     ✔ dplyr   1.1.0
+## ✔ tidyr   1.3.0     ✔ stringr 1.5.0
+## ✔ readr   2.1.3     ✔ forcats 1.0.0
+## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(ISLR)</code></pre>
+<pre><code>## Warning: pakiet &#39;ISLR&#39; został zbudowany w wersji R 4.2.3</code></pre>
+<pre class="r"><code>carseats &lt;- tibble::as.tibble(ISLR::Carseats)</code></pre>
+<pre><code>## Warning: `as.tibble()` was deprecated in tibble 2.0.0.
+## ℹ Please use `as_tibble()` instead.
+## ℹ The signature and semantics have changed, see `?as_tibble`.</code></pre>
+<pre class="r"><code>head(carseats)</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["model"],"name":[1],"type":["chr"],"align":["left"]},{"label":["age"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["price"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["transmission"],"name":[4],"type":["fct"],"align":["left"]},{"label":["mileage"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["fuelType"],"name":[6],"type":["chr"],"align":["left"]},{"label":["tax"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["mpg"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["engineSize"],"name":[9],"type":["dbl"],"align":["right"]},{"label":["Make"],"name":[10],"type":["chr"],"align":["left"]},{"label":["trasManual"],"name":[11],"type":["dbl"],"align":["right"]},{"label":["trasSemiAuto"],"name":[12],"type":["dbl"],"align":["right"]},{"label":["trasAuto"],"name":[13],"type":["dbl"],"align":["right"]}],"data":[{"1":"Citigo","2":"4","3":"8995","4":"Manual","5":"7468","6":"Petrol","7":"145","8":"67.3","9":"1.0","10":"skoda","11":"1","12":"0","13":"0"},{"1":"Fiesta","2":"9","3":"5330","4":"Manual","5":"66937","6":"Petrol","7":"30","8":"54.3","9":"1.2","10":"Ford","11":"1","12":"0","13":"0"},{"1":"T-Roc","2":"3","3":"25990","4":"Semi-Auto","5":"2423","6":"Diesel","7":"145","8":"49.6","9":"2.0","10":"vw","11":"0","12":"1","13":"0"},{"1":"Kuga","2":"3","3":"16800","4":"Manual","5":"10786","6":"Petrol","7":"145","8":"34.4","9":"1.5","10":"Ford","11":"1","12":"0","13":"0"},{"1":"Mondeo","2":"4","3":"14599","4":"Manual","5":"27206","6":"Diesel","7":"145","8":"62.8","9":"2.0","10":"Ford","11":"1","12":"0","13":"0"},{"1":"Focus","2":"5","3":"13295","4":"Manual","5":"60879","6":"Diesel","7":"20","8":"67.3","9":"2.0","10":"Ford","11":"1","12":"0","13":"0"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["Sales"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["CompPrice"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Income"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["Advertising"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["Population"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["Price"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["ShelveLoc"],"name":[7],"type":["fct"],"align":["left"]},{"label":["Age"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["Education"],"name":[9],"type":["dbl"],"align":["right"]},{"label":["Urban"],"name":[10],"type":["fct"],"align":["left"]},{"label":["US"],"name":[11],"type":["fct"],"align":["left"]}],"data":[{"1":"9.50","2":"138","3":"73","4":"11","5":"276","6":"120","7":"Bad","8":"42","9":"17","10":"Yes","11":"Yes"},{"1":"11.22","2":"111","3":"48","4":"16","5":"260","6":"83","7":"Good","8":"65","9":"10","10":"Yes","11":"Yes"},{"1":"10.06","2":"113","3":"35","4":"10","5":"269","6":"80","7":"Medium","8":"59","9":"12","10":"Yes","11":"Yes"},{"1":"7.40","2":"117","3":"100","4":"4","5":"466","6":"97","7":"Medium","8":"55","9":"14","10":"Yes","11":"Yes"},{"1":"4.15","2":"141","3":"64","4":"3","5":"340","6":"128","7":"Bad","8":"38","9":"13","10":"Yes","11":"No"},{"1":"10.81","2":"124","3":"113","4":"13","5":"501","6":"72","7":"Bad","8":"78","9":"16","10":"No","11":"Yes"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<pre class="r"><code>cars_model_ohc &lt;- lm(price ~ log(age) + trasManual + trasSemiAuto, data=cars_train_ohc)
-summary(cars_model_ohc)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + trasManual + trasSemiAuto, data = cars_train_ohc)
-## 
-## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -13246  -3777   -686   2803  35514 
-## 
-## Coefficients:
-##              Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)   37170.0     1007.2  36.905   &lt;2e-16 ***
-## log(age)     -10939.2      586.6 -18.649   &lt;2e-16 ***
-## trasManual    -7376.7      590.8 -12.487   &lt;2e-16 ***
-## trasSemiAuto   1231.9      701.7   1.756   0.0796 .  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 5947 on 747 degrees of freedom
-## Multiple R-squared:  0.5271, Adjusted R-squared:  0.5252 
-## F-statistic: 277.6 on 3 and 747 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>cars_model_ohc &lt;- lm(price ~ log(age) + trasManual + trasAuto, data=cars_train_ohc)
-summary(cars_model_ohc)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + trasManual + trasAuto, data = cars_train_ohc)
-## 
-## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -13246  -3777   -686   2803  35514 
-## 
-## Coefficients:
-##             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)  38402.0      944.9  40.643   &lt;2e-16 ***
-## log(age)    -10939.2      586.6 -18.649   &lt;2e-16 ***
-## trasManual   -8608.6      558.0 -15.426   &lt;2e-16 ***
-## trasAuto     -1231.9      701.7  -1.756   0.0796 .  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 5947 on 747 degrees of freedom
-## Multiple R-squared:  0.5271, Adjusted R-squared:  0.5252 
-## F-statistic: 277.6 on 3 and 747 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>cars_model_ohc &lt;- lm(price ~ log(age) + trasManual + trasAuto + trasSemiAuto, data=cars_train_ohc)
-summary(cars_model_ohc)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + trasManual + trasAuto + trasSemiAuto, 
-##     data = cars_train_ohc)
-## 
-## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -13246  -3777   -686   2803  35514 
-## 
-## Coefficients: (1 not defined because of singularities)
-##              Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)   38402.0      944.9  40.643   &lt;2e-16 ***
-## log(age)     -10939.2      586.6 -18.649   &lt;2e-16 ***
-## trasManual    -8608.6      558.0 -15.426   &lt;2e-16 ***
-## trasAuto      -1231.9      701.7  -1.756   0.0796 .  
-## trasSemiAuto       NA         NA      NA       NA    
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 5947 on 747 degrees of freedom
-## Multiple R-squared:  0.5271, Adjusted R-squared:  0.5252 
-## F-statistic: 277.6 on 3 and 747 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>cars_model_ohc &lt;- lm(price ~ log(age) + trasAuto + trasSemiAuto, data=cars_train_ohc)
-summary(cars_model_ohc)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + trasAuto + trasSemiAuto, data = cars_train_ohc)
-## 
-## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -13246  -3777   -686   2803  35514 
-## 
-## Coefficients:
-##              Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)   29793.4      969.3   30.74   &lt;2e-16 ***
-## log(age)     -10939.2      586.6  -18.65   &lt;2e-16 ***
-## trasAuto       7376.7      590.8   12.49   &lt;2e-16 ***
-## trasSemiAuto   8608.6      558.0   15.43   &lt;2e-16 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 5947 on 747 degrees of freedom
-## Multiple R-squared:  0.5271, Adjusted R-squared:  0.5252 
-## F-statistic: 277.6 on 3 and 747 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>model_summary(cars_model_ohc, cars_test_ohc, cars_test_ohc$price)</code></pre>
-<pre><code>## [1] &quot;Wartośći charakterystyk liczbowych modelu.&quot;
-## [1] &quot;------------------------------------------&quot;
-## Treningowe R^2 wyniosło:  0.5271222 
-##  Treningowe &quot;poprawione&quot; R^2 wyniosło:  0.5252231 
-##  Kryterium informacyjne Akaikego (AIC) wyniosło:  15190.53 
-##  --------------------------------------------- 
-##  Charakterystyki &quot;out-of-sample&quot; 
-##  Charakterystyka |   train  |   test   | 
-##  RMSE wyniosło:  | 5946.803 | 8888.709 | 
-##  MAE wyniosło:   | 4301.762 | 5084.386 | 
-##  MAPE wyniosło:  | 30.41 %| 29.98 %|</code></pre>
+<p>Wskazówka: Po zaimportowaniu biblioteki ISLR informacje o danych
+Carseats można znaleźć wpisując w konsoli “?ISLR::Carseats”.</p>
+<pre class="r"><code>?ISLR::Carseats</code></pre>
+<pre><code>## uruchamianie serwera httpd dla pomocy ... wykonano</code></pre>
 </div>
-<div id="interakcje" class="section level1">
-<h1>Interakcje</h1>
-<p>Do modelu możemy wprowadzić również tzw. czynniki interakcyjne.
-Wprowadzenie czynników interakcyjnych może sugerować przede wszystkim
-wiedza ekspercka. Jeżeli mamy zmienną objaśniającą jakościową (załóżmy,
-że binarną) <span class="math inline">\(d\)</span>, to model z
-czynnikiem interakcji i jedną inną zmienną objaśniającą wygląda
-następująco <span class="math display">\[ y_i = \beta_0 + \beta_1x_i +
-\beta_2d + \beta_3dx_i.\]</span> W R czynniki interakcyjne wprowadzamy
-podając znak “:” między nazwami dwóch zmiennych. Spójżmy na przykładzie,
-dodajmy do naszego modelu interakcje między rodzajem paliwa, a rozmiarem
-silnika. Zasada hierarchiczności mówi, że przed dodaniem czynnika
-interakcji wprowadzamy do modelu zmienne bez interakcji.</p>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age) + transmission + engineSize + fuelType, data=cars_train)
-summary(cars_model)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + transmission + engineSize + fuelType, 
-##     data = cars_train)
-## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -19123.3  -2455.7   -254.3   2081.2  26639.8 
-## 
-## Coefficients:
-##                       Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)            19739.7      949.9  20.781  &lt; 2e-16 ***
-## log(age)              -12433.0      431.4 -28.818  &lt; 2e-16 ***
-## transmissionSemi-Auto   4140.5      442.2   9.363  &lt; 2e-16 ***
-## transmissionAutomatic   2321.2      473.9   4.898 1.19e-06 ***
-## engineSize              8345.7      365.3  22.848  &lt; 2e-16 ***
-## fuelTypePetrol           678.1      382.6   1.772   0.0767 .  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 4333 on 745 degrees of freedom
-## Multiple R-squared:  0.7496, Adjusted R-squared:  0.7479 
-## F-statistic:   446 on 5 and 745 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age) + transmission + engineSize + fuelType + engineSize:fuelType, data=cars_train)
-summary(cars_model)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = price ~ log(age) + transmission + engineSize + fuelType + 
-##     engineSize:fuelType, data = cars_train)
-## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -16725.0  -2437.6   -243.4   2085.6  26089.6 
-## 
-## Coefficients:
-##                           Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)                17876.7     1301.0  13.740  &lt; 2e-16 ***
-## log(age)                  -12465.4      430.7 -28.940  &lt; 2e-16 ***
-## transmissionSemi-Auto       4129.1      441.2   9.358  &lt; 2e-16 ***
-## transmissionAutomatic       2298.5      473.0   4.860 1.44e-06 ***
-## engineSize                  9299.2      583.9  15.926  &lt; 2e-16 ***
-## fuelTypePetrol              3256.8     1291.5   2.522   0.0119 *  
-## engineSize:fuelTypePetrol  -1434.1      686.2  -2.090   0.0369 *  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## Residual standard error: 4324 on 744 degrees of freedom
-## Multiple R-squared:  0.7511, Adjusted R-squared:  0.749 
-## F-statistic: 374.1 on 6 and 744 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>model_summary(cars_model, cars_test, cars_test$price)</code></pre>
-<pre><code>## [1] &quot;Wartośći charakterystyk liczbowych modelu.&quot;
-## [1] &quot;------------------------------------------&quot;
-## Treningowe R^2 wyniosło:  0.7510537 
-##  Treningowe &quot;poprawione&quot; R^2 wyniosło:  0.7490461 
-##  Kryterium informacyjne Akaikego (AIC) wyniosło:  14714.69 
-##  --------------------------------------------- 
-##  Charakterystyki &quot;out-of-sample&quot; 
-##  Charakterystyka |   train  |   test   | 
-##  RMSE wyniosło:  | 4323.503 | 6551.709 | 
-##  MAE wyniosło:   | 3048.138 | 3677.865 | 
-##  MAPE wyniosło:  | 21.29 %| 22.5 %|</code></pre>
-<p>Nasz pomysł okazał się nie trafiony, nie znaczy to jednak, że w
-przypadku każdych danych wprowadzenie czynnika interakcji będzie złym
-pomysłem. Jest to narzędzie, o którym czasem warto pamiętać przy budowie
-modelu regresji liniowej.</p>
-</div>
-<div id="vif" class="section level1">
-<h1>VIF</h1>
-<p>Poprzednio wspominaliśmy o współczynniku VIF, który miał nam pomagać
-w wykrywaniu multikolinearności w danych. Na dzisiejszych zajęciach
-znaleźliśmy przykład, w którym na pewno występuje multikolinearność więc
-jest to świetna okazja na poznanie jak działa VIF (Variance Inflation
-Factor). VIF jest współczynnikiem, który definiujemy dla poszczególnego
-współczynnika zmiennej objaśnianej. Powstaje jako iloraz wariancji
-współczynnika <span class="math inline">\(\beta_i\)</span> w pełnym
-modelu do jego wariancji w modelu, który ma tylko <span class="math inline">\(x_i\)</span> jako zmienną objaśniającą. Możemy go
-wyrazić wzorem <span class="math display">\[ VIF(\beta_i) = \frac{1}{1 -
-R^2_{X_j|X_{-j}} }\]</span> gdzie przez <span class="math inline">\(R^2_{X_j|X_{-j}}\)</span> oznaczamy współczynnik
-<span class="math inline">\(R^2\)</span> modelu regresji, gdzie zmienną
-objaśnianą jest <span class="math inline">\(X_j\)</span>, a
-objaśniającymi są wszystkie pozostałe zmienne niezależne z modelu
-pierwotnego. Z tej postaci można zauważyć, że VIF jest zawsze większy od
-<span class="math inline">\(1\)</span>, a coraz większe wartości VIF
-wskazują na coraz większy stopień kolinearności. Praktyka pokazuje, że
-zaalarmowani powinniśmy być, gdy VIF danej zmiennej przekracza 5, a
-poważnie martwić, gdy przekracza 10.</p>
-<p>Do wyznaczania VIF w R służY funkcja vif() z pakietu <span class="math inline">\(\textit{car}\)</span>. Ważne, aby zauważyć, że w
-wypadku gdy w naszym modelu znajduja się zmienne jakościowe, to ta
-funkcja zwraca GVIF. GVIF traktuje zmienne jakościowe niejako “łącznie”,
-nie licząc VIF dla każdej z osobna, przez co daje nam rzetelną
-informację o multikolinearności. GVIF dla zmiennych ciągłych jest taki
-sam jak VIF.</p>
-<pre class="r"><code>library(car)
-cars_model &lt;- lm(price ~ log(age) + engineSize + mpg, data=cars_train)
-car::vif(cars_model)</code></pre>
-<pre><code>##   log(age) engineSize        mpg 
-##   1.105355   1.236404   1.331457</code></pre>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age) + engineSize + mpg + transmission, data=cars_train)
-car::vif(cars_model)</code></pre>
-<pre><code>##                  GVIF Df GVIF^(1/(2*Df))
-## log(age)     1.144101  1        1.069626
-## engineSize   1.452202  1        1.205073
-## mpg          1.390183  1        1.179060
-## transmission 1.424772  2        1.092537</code></pre>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age) + trasAuto + trasManual + trasSemiAuto, data = cars_train_ohc)
-car::vif(cars_model)</code></pre>
-<pre><code>## Error in vif.default(cars_model): there are aliased coefficients in the model</code></pre>
-<p>Powyższy błąd znaczy dokładnie tyle, że mamy perfekcyjnie skorelowane
-zmienne w modelu.</p>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age) + trasAuto + trasManual, data = cars_train_ohc)
-car::vif(cars_model)</code></pre>
-<pre><code>##   log(age)   trasAuto trasManual 
-##   1.044575   1.514807   1.569555</code></pre>
-<pre class="r"><code>cars_model &lt;- lm(price ~ log(age) + trasSemiAuto + trasManual, data = cars_train_ohc)
-car::vif(cars_model)</code></pre>
-<pre><code>##     log(age) trasSemiAuto   trasManual 
-##     1.044575     1.745065     1.758965</code></pre>
-<p>Zauważmy, że dla zmiennych kategorialnych VIF zależy od wyboru
-zmiennej podstawowej!</p>
+<div id="zadanie-2" class="section level1">
+<h1>Zadanie 2</h1>
+<p>Dopasuj model (lub modele) regresji liniowej wielorakiej przewidujący
+wartość zmiennej Sales. Model zbuduj w wybrany przez siebie sposób. Oceń
+jakość modelu i spełnienie założeń. Porównaj otrzymane modele z modelem
+regresji liniowej prostej.</p>
 </div>
 
 

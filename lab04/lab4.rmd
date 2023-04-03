@@ -6,7 +6,10 @@ author:
 subtitle: Regresja liniowa wieloraka - zmienne jakościowe i miary jakości modelu
 output:
   html_document:
+    theme: readable
     df_print: paged
+    toc: true
+    toc_float: true
 ---
 
 # Zmienne jakościowe
@@ -19,56 +22,93 @@ Czyli zupełnie taką jak w przypadku modelu regresji liniowej prostej. Faktyczn
 \[ y_i = \beta_0 + \beta_1x_1 + \beta_2x_2 + \beta_3x_3 + \beta_4x_4 + \varepsilon_i.\]
 Niestety należy zauważyć pewien problem z tym podejściem, na szczęście łatwo sobie z nim poradzimy. Zbudujmy przykładową macierz planu dla modelu opisującego zmienną $y$ za pomocą $x$. 
 \[ X = \left[ \begin{array}{ccccc}1 \; 0 \; 1 \; 0 \; 0 \\ 1 \; 0 \; 0 \; 0 \; 1 \\ 1 \; 0 \; 0 \; 0 \; 1 \\ 1 \; 0 \; 1 \; 0 \; 0 \\ 1 \; 1 \; 0 \; 0 \; 0 \end{array}\right]\]
-Oznaczając kolumny tej macierzy przez $c_0, c_1, c_2, c_3, c_4$ musimy niestety zauważyć, że zachodzi multikolinearność postaci $c_0 = c_1 + c_2 + c_3 + c_4$. Z poprzednich zajęć pamiętamy, że taka sytuacja uniemożliwia nam zbudowanie dobrego modelu. Ale nic nie stoi na przeszkodzie, żeby wyrzucić jedną z kolumn tej macierzy. Jest to równoznaczne z zakodowaniem wartości zmiennej $x$ za pomocą zmiennych $x_1, x_2, x_3$ i w momencie, gdy $x$ przyjmuje $4$ to wszystkie z $x_1, x_2, x_3$ przyjmują $0$.
+Oznaczając kolumny tej macierzy przez $c_0, c_1, c_2, c_3, c_4$ musimy niestety zauważyć, że zachodzi multikolinearność postaci $c_0 = c_1 + c_2 + c_3 + c_4$. Z poprzednich zajęć pamiętamy, że taka sytuacja uniemożliwia nam zbudowanie modelu. Ale nic nie stoi na przeszkodzie, żeby wyrzucić jedną z kolumn tej macierzy. Jest to równoznaczne z zakodowaniem wartości zmiennej $x$ za pomocą zmiennych $x_1, x_2, x_3$ i w momencie, gdy $x$ przyjmuje $4$ to wszystkie z $x_1, x_2, x_3$ przyjmują $0$.
 
 Dla przykładu, wróćmy do zbioru danych z poprzednich zajęć. 
 
-```{r, message=FALSE}
+```{r, message=FALSE, echo=FALSE}
 library(tidyverse)
+library(caret)
+set.seed(196883)
 cars <- readr::read_csv('cars_dataset.csv')
 cars <- cars %>% dplyr::mutate(year = 2022 - year) %>% dplyr::rename(age = year)
 cars <- cars %>% dplyr::filter((fuelType!='Hybrid')&(fuelType!='Other')&(fuelType!='Electric'))
 cars_sample <- dplyr::sample_n(cars, 1000)
-head(cars_sample)
+partition <- createDataPartition(cars_sample$price, p=0.75, list=FALSE)
+cars_train <- cars_sample[partition,]
+cars_test <- cars_sample[-partition,]
 ```
+Zerknijmy na możliwe wartości w kolumnie "transmission" oraz "fuelType".
 ```{r}
-unique(cars_sample$transmission)
+unique(cars_train$transmission)
 ```
 
 ```{r}
 unique(cars_sample$fuelType)
 ```
 Zbudujmy model regresji badający zależność ceny od wieku i rodzaju skrzyni biegów w aucie. Funkcja lm() w R jest na tyle dobrze zaprojektowana, że jeżeli mamy w naszej ramce danych dane w postaci "stringów", to R niejako automatycznie dokona one-hot codingu.
+```{r, echo = FALSE}
+library(broom)
 
+model_summary <- function(model, test_data, test_y){
+  model_glance <- broom::glance(model)
+  model_augment <- broom::augment(model)
+  train_mae <- mean(abs(model_augment$.resid))
+  train_mape <- mean(abs(model_augment$.resid/dplyr::pull(model_augment, var=1)))*100
+  predicted_y <- predict(model, test_data)
+  test_rmse <- sqrt(mean((test_y - predicted_y)^2))
+  test_mae <- mean(abs(test_y - predicted_y))
+  test_mape <- mean(abs((test_y - predicted_y)/test_y))*100
+  print("Wartośći charakterystyk liczbowych modelu.")
+  print("------------------------------------------")
+  cat("Treningowe R^2 wyniosło: ", model_glance$r.squared, "\n",
+  "Treningowe \"poprawione\" R^2 wyniosło: ", model_glance$adj.r.squared, "\n",
+  "Kryterium informacyjne Akaikego (AIC) wyniosło: ", model_glance$AIC, "\n",
+  "---------------------------------------------", "\n",
+  "Charakterystyki \"out-of-sample\"", "\n",
+  "Charakterystyka |   train  |   test   | \n", 
+  "RMSE wyniosło:  |", model_glance$sigma, "|", test_rmse , "|", "\n",
+  "MAE wyniosło:   |", train_mae, "|",  test_mae, "|" , "\n",
+  "MAPE wyniosło:  |", round(train_mape,2), "%|", round(test_mape,2), "%|",  "\n")
+}
+```
 ```{r}
-cars_model <- lm(log(price) ~ log(age)+transmission, data=cars_sample)
+cars_model <- lm(price ~ log(age)+transmission, data=cars_train)
 summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_test, cars_test$price)
 ```
 Spróbujmy wykonać one-hot coding samodzielnie i zobaczmy czy otrzymamy ten sam wynik.
 ```{r}
-cars_sample$transmission <- as_factor(cars_sample$transmission)
-cars_sample <- cars_sample %>% dplyr::mutate(trasManual = ifelse(transmission=='Manual',1,0)) %>% dplyr::mutate(trasSemiAuto = ifelse(transmission=='Semi-Auto',1,0)) %>%     dplyr::mutate(trasAuto = ifelse(transmission=='Automatic',1,0))
-head(cars_sample)
+cars_train$transmission <- as_factor(cars_train$transmission)
+cars_test$transmission <- as_factor(cars_test$transmission)
+cars_train_ohc <- cars_train %>% dplyr::mutate(trasManual = ifelse(transmission=='Manual',1,0)) %>% dplyr::mutate(trasSemiAuto = ifelse(transmission=='Semi-Auto',1,0)) %>%     dplyr::mutate(trasAuto = ifelse(transmission=='Automatic',1,0))
+cars_test_ohc <- cars_test %>% dplyr::mutate(trasManual = ifelse(transmission=='Manual',1,0)) %>% dplyr::mutate(trasSemiAuto = ifelse(transmission=='Semi-Auto',1,0)) %>%     dplyr::mutate(trasAuto = ifelse(transmission=='Automatic',1,0))
+head(cars_train_ohc)
 ```
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + trasManual + trasSemiAuto, data=cars_sample)
-summary(cars_model)
+cars_model_ohc <- lm(price ~ log(age) + trasManual + trasSemiAuto, data=cars_train_ohc)
+summary(cars_model_ohc)
 ```
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + trasManual + trasAuto, data=cars_sample)
-summary(cars_model)
+cars_model_ohc <- lm(price ~ log(age) + trasManual + trasAuto, data=cars_train_ohc)
+summary(cars_model_ohc)
 ```
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + trasManual + trasAuto + trasSemiAuto, data=cars_sample)
-summary(cars_model)
+cars_model_ohc <- lm(price ~ log(age) + trasManual + trasAuto + trasSemiAuto, data=cars_train_ohc)
+summary(cars_model_ohc)
 ```
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + trasAuto + trasSemiAuto, data=cars_sample)
-summary(cars_model)
+cars_model_ohc <- lm(price ~ log(age) + trasAuto + trasSemiAuto, data=cars_train_ohc)
+summary(cars_model_ohc)
+```
+```{r}
+model_summary(cars_model_ohc, cars_test_ohc, cars_test_ohc$price)
 ```
 
 # Interakcje
@@ -77,12 +117,15 @@ Do modelu możemy wprowadzić również tzw. czynniki interakcyjne. Wprowadzenie
 \[ y_i = \beta_0 + \beta_1x_i + \beta_2d + \beta_3dx_i.\]
 W R czynniki interakcyjne wprowadzamy podając znak ":" między nazwami dwóch zmiennych. Spójżmy na przykładzie, dodajmy do naszego modelu interakcje między rodzajem paliwa, a rozmiarem silnika. Zasada hierarchiczności mówi, że przed dodaniem czynnika interakcji wprowadzamy do modelu zmienne bez interakcji.
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + transmission + engineSize + fuelType, data=cars_sample)
+cars_model <- lm(price ~ log(age) + transmission + engineSize + fuelType, data=cars_train)
 summary(cars_model)
 ```
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + transmission + engineSize + fuelType + engineSize:fuelType, data=cars_sample)
+cars_model <- lm(price ~ log(age) + transmission + engineSize + fuelType + engineSize:fuelType, data=cars_train)
 summary(cars_model)
+```
+```{r}
+model_summary(cars_model, cars_test, cars_test$price)
 ```
 Nasz pomysł okazał się nie trafiony, nie znaczy to jednak, że w przypadku każdych danych wprowadzenie czynnika interakcji będzie złym pomysłem. Jest to narzędzie, o którym czasem warto pamiętać przy budowie modelu regresji liniowej.
 
@@ -96,30 +139,38 @@ Do wyznaczania VIF w R służY funkcja vif() z pakietu $\textit{car}$. Ważne, a
 
 ```{r, message=FALSE, warning=FALSE}
 library(car)
-cars_model <- lm(log(price) ~ log(age) + engineSize + mpg, data=cars_sample)
+cars_model <- lm(price ~ log(age) + engineSize + mpg, data=cars_train)
 car::vif(cars_model)
 ```
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + engineSize + mpg + transmission, data=cars_sample)
+cars_model <- lm(price ~ log(age) + engineSize + mpg + transmission, data=cars_train)
 car::vif(cars_model)
 ```
 
 ```{r, error=TRUE}
-cars_model <- lm(log(price) ~ log(age) + trasAuto + trasManual + trasSemiAuto, data = cars_sample)
+cars_model <- lm(price ~ log(age) + trasAuto + trasManual + trasSemiAuto, data = cars_train_ohc)
 car::vif(cars_model)
 ```
 
 Powyższy błąd znaczy dokładnie tyle, że mamy perfekcyjnie skorelowane zmienne w modelu.
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + trasAuto + trasManual, data = cars_sample)
+cars_model <- lm(price ~ log(age) + trasAuto + trasManual, data = cars_train_ohc)
 car::vif(cars_model)
 ```
 
 ```{r}
-cars_model <- lm(log(price) ~ log(age) + trasSemiAuto + trasManual, data = cars_sample)
+cars_model <- lm(price ~ log(age) + trasSemiAuto + trasManual, data = cars_train_ohc)
 car::vif(cars_model)
 ```
 
 Zauważmy, że dla zmiennych kategorialnych VIF zależy od wyboru zmiennej podstawowej!
+
+# Ćwiczenie
+
+W pliku *MBA_ADMISSIONS.csv* znajdują się dane dotyczące rekrutacji na studia z zakresu MBA (Masters of Buisness Administration). W kolumnie *post_score* znajduję się wynik kandydata po egzaminie wstępnym, w kolumnie *pre_score* znajduje się wynik kandydata przed egzaminem wstępnym. Zbuduj model regresji liniowej, który przewiduje za pomocą wybranych przez Ciebie wynik kandydata (a w ten sposób to czy się dostanie).
+```{r}
+admissions <- read_csv("MBA_ADMISSIONS.csv")
+admissions
+```
