@@ -38,11 +38,10 @@ partition <- createDataPartition(cars_sample$price, p=0.75, list=FALSE)
 cars_train <- cars_sample[partition,]
 cars_test <- cars_sample[-partition,]
 ```
-Zerknijmy na możliwe wartości w kolumnie "transmission" oraz "fuelType".
 ```{r}
 cars_train
 ```
-
+Zerknijmy na możliwe wartości w kolumnie "transmission" oraz "fuelType".
 ```{r}
 unique(cars_train$transmission)
 ```
@@ -52,37 +51,26 @@ unique(cars_sample$fuelType)
 ```
 
 ```{r}
-cars_model <- lm(price~fuelType, data=cars_train)
+cars_model <- lm(price ~ fuelType, data=cars_train)
 summary(cars_model)
 ```
 ```{r}
-cars_train_ohc1 <- cars_train %>% mutate(fuelType=ifelse(fuelType=="Petrol",0,1))
-cars_model_ohc1 <- lm(price~fuelType, data=cars_train_ohc1)
-summary(cars_model_ohc1)
+mean(cars_train$price)
 ```
 ```{r}
-cars_train %>% group_by(fuelType) %>% summarise(mean=mean(price))
+filter(cars_train, fuelType=="Petrol") %>% summarise(mean = mean(price))
 ```
 ```{r}
-unique(cars_train$transmission)
+filter(cars_train, fuelType=="Diesel") %>% summarise(mean = mean(price))
 ```
-```{r}
-cars_train_bad <- cars_train %>% mutate(transmission=ifelse(transmission=="Automatic",1,ifelse(transmission=="Manual",0,2)))
+
+```{R}
+cars_train_ohc1 <- cars_train %>% mutate(fuelType = ifelse(fuelType=="Diesel", 1, 0)) 
 ```
 
 ```{r}
-cars_model_bad <- lm(price~transmission, data=cars_train_bad)
-summary(cars_model_bad)
-```
-```{r}
-cars_train %>% group_by(transmission) %>% summarise(mean=mean(price))
-```
-```{r}
-cars_model <- lm(price~transmission, data=cars_train)
-summary(cars_model)
-```
-```{r}
-cars_train %>% group_by(transmission) %>% summarise(mean=mean(price))
+cars_model_ohc1 <- lm(price ~ fuelType, data=cars_train_ohc1) 
+summary(cars_model_ohc1)
 ```
 
 
@@ -112,6 +100,19 @@ model_summary <- function(model, test_data, test_y){
   "MAPE wyniosło:  |", round(train_mape,2), "%|", round(test_mape,2), "%|",  "\n")
 }
 ```
+```{r}
+unique(cars_train$transmission)
+```
+
+```{r}
+cars_train_bad <- cars_train %>% mutate(transmission = ifelse(transmission=="Automatic",1, ifelse(transmission=="Semi-Auto",0,2))) 
+```
+
+```{r}
+cars_model_bad <- lm(price~transmission, data=cars_train_bad)
+summary(cars_model_bad)
+```
+
 ```{r}
 cars_model <- lm(price ~ log(age)+transmission, data=cars_train)
 summary(cars_model)

@@ -1,10 +1,15 @@
 ---
-title: "Regresja i analiza wariancji - Laboratorium 4"
+title: "Regresja i analiza wariancji - Laboratorium 5"
 subtitle: 'Jednoczynnikowa analiza wariancji - podstawy' 
 author: 
   name: 'Adrian Kowalski'
   affiliation: 'Politechnika Krakowska'
-output: html_notebook
+output:
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: true
+    toc_float: true
 ---
 
 # Podstawy
@@ -17,7 +22,7 @@ Przypomnimy teraz konstrukcję testu t studenta dla średniej dwóch niezależny
 \[ H_0: \mu_1 = \mu_2, \\ H_1: \mu_1 \neq \mu_2. \]
 Mieliśmy w tym wypadku dwa scenariusze, albo wariancja obu populacji była równa, albo te wariancje były rózne. W pierwszym wypadku statystyka testowa przyjmowała postać
 \[ t = \frac{(\overline{x_1} - \overline{x_2}) - (\mu_1 - \mu_2))}{s_p \sqrt{\frac{1}{n_1} + \frac{1}{n_2}}}, \]
-gdzie $s_p = \sqrt{\frac{(n_1 - 1)s^2_1 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}}$ to pierwiastek z tzw. łączonej wariancji prób $x_1, x_2$ (łączona wariancja pomaga, gdy próby mają różną wielkość). Ta statystyka ma rozkład $t$-studenta z $n_1 + n_2 - 2$ stopniami swobody. W wypadku różnych wariancji statystyka testowa ma postać
+gdzie $s_p = \sqrt{\frac{(n_1 - 1)s^2_1 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}}$ to pierwiastek z tzw. łączonej wariancji (pooled variance) prób $x_1, x_2$ (łączona wariancja pomaga, gdy próby mają różną wielkość). Ta statystyka ma rozkład $t$-studenta z $n_1 + n_2 - 2$ stopniami swobody. W wypadku różnych wariancji statystyka testowa ma postać
 \[ t = \frac{\overline{x_1} - \overline{x_2} - (\mu_1 - \mu_2)}{\sqrt{\frac{s^2_1}{n_1}+\frac{s_2^2}{n_2}}}. \]
 Ta statystyka ma rozkład $t$-studenta o $v$ pseudo-stopniach swobody, gdzie $v$ (tak zwana poprawka Welscha) dane jest wzorem
 \[ \frac{\left(\frac{s^2_1}{n_1} + \frac{s^2_2}{n_2} \right)^2}{\frac{\left( \frac{s_1^2}{n_1}\right)^2}{n_1-1} + \frac{\left( \frac{s_2^2}{n_2}\right)^2}{n_2-1}}. \]
@@ -27,8 +32,11 @@ W R test $t$-studenta wykonujemy oczywiście poleceniem t.test(). Równością w
 
 Na tych zajęciach zajmiemy się klasycznym zbiorem danych [Student Performance Data Set](https://archive.ics.uci.edu/ml/datasets/student+performance). Jest w nim bardzo dużo cech, ale skupimy się jedynie na kilku z nich.
 
-```{r}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
+```
+
+```{r}
 student <- readr::read_csv('student-mat.csv')
 head(student)
 ```
@@ -52,11 +60,11 @@ t.test(G1 ~ school, data=student, var.equal=FALSE, alternative='two.sided')
 
 # Jednoczynnikowa Analiza Wariancji
 
-W powyższych rozważaniach zakładaliśmy, że były tylko dwie kategorie, dlatego mogliśmy stosować test $t$-studenta. Na szczęście jeżeli mamy więcej grup, to mamy narzędzie do weryfikacji różnicy w średnich między tymi grupami. Tym narzędziem jest analiza wariancji. W klasycznej analizie wariancji zakładamy, że wariancja każdej z grup jest równa pewnej, tej samej, stałej. Do analizy wariancji używamy statystyki testowej $F$, która ma rozkład zwany rozkładem Snedecora-Fischera. Przy analizie wariancji zakładamy, że mamy próby pochodzące z $k$ grup $x_1, x_2, \dots, x_k$ o średnich $\mu_1, \mu_2, \dots, \mu_n$. Hipotezy naszego testu wyglądają następująco
+W powyższych rozważaniach zakładaliśmy, że były tylko dwie kategorie, dlatego mogliśmy stosować test $t$-studenta. Na szczęście jeżeli mamy więcej grup, to mamy narzędzie do weryfikacji różnicy w średnich między tymi grupami. Tym narzędziem jest analiza wariancji. W klasycznej analizie wariancji zakładamy, że wariancja każdej z grup jest równa pewnej, jednakowej stałej. Do analizy wariancji używamy statystyki testowej $F$, która ma rozkład zwany rozkładem Snedecora-Fischera. Przy analizie wariancji zakładamy, że mamy próby pochodzące z $k$ grup $x_1, x_2, \dots, x_k$ o średnich $\mu_1, \mu_2, \dots, \mu_n$. Hipotezy naszego testu wyglądają następująco
 \[ H_0: \mu_1 = \mu_2 = \dots = \mu_k, \\
 H_1: \text{przynajmniej jedna ze średnich} \; \mu_i \; \text{jest różna od pozostałych.}\]
 
-Aby wyprowadzić statystykę testową użyjemy zwyczajowej notacji. $y_{ij}$ będzie oznaczało $j$-tą obserwację z $i$-tej grupy, $\overline{y}$ średnią bez podziału na grupy, a $\overline{y}_i$ średnią $i$-tej grupy. Wtedy zakładamy, że $y_{ij} = \overline{y} + (\overline{y}_i - \overline{y}) + (y_{ij} - \overline{y}_i)$, czyli że możemy rozłożyć obserwację na $3$ składniki: średnią wszystkich obserwacji, odchylenie średniej w grupie od całkowitej średniej i odchylenie obserwacji od średniej w grupie. Chcemy też rozbić całkowitą sumę kwadratów \[ SST = \sum_{i,j} (y_{ij} - \overline{y})^2 = \sum_{i,j} y_{ij}^2 - \left( \sum_{i,j} y_{ij} \right)^2,\]
+Aby wyprowadzić statystykę testową użyjemy zwyczajowej notacji. $y_{ij}$ będzie oznaczało $j$-tą obserwację z $i$-tej grupy, $\overline{y}$ średnią bez podziału na grupy, a $\overline{y}_i$ średnią $i$-tej grupy. Wtedy **zakładamy**, że $y_{ij} = \overline{y} + (\overline{y}_i - \overline{y}) + (y_{ij} - \overline{y}_i)$, czyli że możemy rozłożyć obserwację na $3$ składniki: średnią wszystkich obserwacji, odchylenie średniej w grupie od całkowitej średniej i odchylenie obserwacji od średniej w grupie. Chcemy też rozbić całkowitą sumę kwadratów \[ SST = \sum_{i,j} (y_{ij} - \overline{y})^2 = \sum_{i,j} y_{ij}^2 - \left( \sum_{i,j} y_{ij} \right)^2,\]
 gdzie sumujemy po wszystkich $i$ - grupach i wszystkich $j$ - obserwacjach w grupach. Na sumę kwadrtów pomiędzy grupami $SSA$ i sumę kwadratów wewnątrz grup $SSW$. Sumę kwadratów pomiędzy grupami wyznaczamy jako 
 \[ SSA = \sum_{i=1}^k n_i(\overline{y}_i - \overline{y})^2, \]
 gdzie $n_i$ to liczność $i$-tej grupy. Natomiast sumę kwadratów wewnątrz grup wyznaczamy jako
@@ -75,6 +83,14 @@ Analizę wariancji w R przeprowadzamy za pomocą polecenia aov(). Wprowadzamy do
 ```{r}
 summary(aov(G1 ~ school, data=student))
 ```
+Zbudujmy teraz model ANOVA, aby porównać średnie wyniki w zależności od spożycia alkoholu w tygodniu.
+
+```{r}
+summary(aov(G1 ~ Walc, data = student))
+```
+
+UWAGA: Zauważmy, że w powyższym podsumowaniu jest "coś nie tak", mianowicie mamy tylko 1 stopień swobody przy zmiennej "Walc"!
+
 ```{r}
 student <- student %>% dplyr::mutate(Walc = as.character(Walc))
 ```
