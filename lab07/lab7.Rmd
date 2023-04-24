@@ -6,7 +6,10 @@ author:
 subtitle: Dwuczynnikowa analiza wariancji
 output:
   html_document:
+    theme: readable
     df_print: paged
+    toc: true
+    toc_float: true
 ---
 
 # Dwuczynnikowa analiza wariancji

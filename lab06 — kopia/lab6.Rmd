@@ -4,8 +4,20 @@ subtitle: 'Jednoczynnikowa analiza wariancji - ciąg dalszy'
 author: 
   name: 'Adrian Kowalski'
   affiliation: 'Politechnika Krakowska'
-output: html_notebook
+output:
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: true
+    toc_float: true
 ---
+
+# Analiza mocy
+
+Podstawą frekwentystycznego podejścia do testowania hipotez jest analiza mocy apriori (czyli przed wykonaniem testu), w celu wyznaczenia odpowiedniej jaką ilość obserwacji należy zebrać, aby uzyskać odpowiednią moc testu. Równania mocy są na ogół bardzo trudne do rozwiązania i wykorzystuje się jedynie numeryczne przybliżenia. W celu wyznaczenia rozmiaru próby z równania mocy bardzo często potrzebne są również oszacowane wartości parametrów populacji, które trudno jest przecież znać. 
+
+# Zadanie
+
 
 W pliku danec2a.xlsx znajdują się dane biometryczne drzewek z 7-letniej
 plantacji sosnowej założonej z sadzonek wyprodukowanych z odkrytym systemem
@@ -16,11 +28,49 @@ Zbadaj czy system produkcji sadzonek wpływa na wysokość (H) i grubość (D0) 
 letnich sosen.
 
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 library(tidyverse)
+```
+```{r, message=FALSE, warning=FALSE}
 data1 <- readr::read_csv('danec2a.csv')
 summary(data1)
 ```
+
+# Analiza mocy - ciąg dalszy
+
+Przeprowadzimy analizę mocy dla eksperymentu powyżej korzystając z danych w pliku. W celu rozwiązania równania mocy dla jednoczynnikowej, standardowej, analizy wariancji potrzebne nam są
+
+- wariancja wewnątrz grup,
+- wariancja pomiędzy grupami,
+- oczekiwana moc,
+- oczekiwany poziom istotności.
+
+Do rozwiązania równania mocy służ funkcja *power.anova.test*. Atrybut tej funkcji, który zostanie pozostawiony przez nas jako **NULL** zostanie wyliczony z równania mocy.
+
+Wyliczamy wariancję wewnątrz grup, jako średnią arytmetyczną oszacowanej wariancji z każdej grupy (ponieważ zakładamy, że wariancje są równe).
+```{r}
+no_groups <- length(unique(data1$System))
+within_var_est <- data1 %>% group_by(System) %>% summarise(var = var(H)) %>% summarise(sum = sum(var)/no_groups) %>% pull(sum)
+within_var_est
+```
+Wyliczamy wariancję między grupami (jest to zatem wariancja wektora ze średnimi wewnątrz grup).
+```{r}
+between_var_est <- data1 %>% group_by(System) %>% summarise(mean=mean(H)) %>% summarise(var = var(mean)) %>% pull(var)
+between_var_est
+```
+Jesteśmy zatem gotowi do wyliczenia rozmiaru próby dla zbalansowanego projektu eksperymentu.
+
+```{r}
+power_analysis <- power.anova.test(groups=no_groups, n = NULL, 
+                                   between.var = between_var_est,
+                                   within.var = within_var_est,
+                                   sig.level = 0.05,
+                                   power = 0.8)
+power_analysis
+```
+Czy powyższy eksperyment był zaprojektowany tak, aby osiągnął moc $0.8$?
+
+
 
 # Test Bartletta i Levene
 
@@ -44,8 +94,10 @@ W praktyce założenie o równej wariancji między grupami może nie być zawsze
 oneway.test(H ~ System, data = data1)
 ```
 Nie możemy też użyć procedury Tukeya do analizy post-hoc, ale na szczęście tutaj również mamy alternatywę nie zakładającą stałej wariancji. Jest to test Gamesa-Howella, który znajdziemy w pakiecie *rstatix*.
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 library(rstatix)
+```
+```{r}
 ghTest1 <- rstatix::games_howell_test(H ~ System, data = data1)
 ghTest1 <- ghTest1 %>% dplyr::mutate(gr_label = paste(group1,group2, sep='-')) %>% dplyr::mutate(order = row_number())
 ghTest1
